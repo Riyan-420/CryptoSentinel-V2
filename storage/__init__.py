@@ -1,0 +1,2 @@
+# CryptoSentinel Storage Module
+

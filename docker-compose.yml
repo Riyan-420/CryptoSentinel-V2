@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # Streamlit Dashboard
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8501:8501"
+    environment:
+      - HOPSWORKS_API_KEY=${HOPSWORKS_API_KEY}
+      - HOPSWORKS_PROJECT_NAME=${HOPSWORKS_PROJECT_NAME:-CryptoSentinel}
+      - TRAINING_INTERVAL_MINUTES=${TRAINING_INTERVAL_MINUTES:-30}
+      - PREDICTION_REFRESH_MINUTES=${PREDICTION_REFRESH_MINUTES:-5}
+      - DIRECTION_TOLERANCE_PCT=${DIRECTION_TOLERANCE_PCT:-0.1}
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # FastAPI Backend
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m api.main
+    ports:
+      - "8000:8000"
+    environment:
+      - HOPSWORKS_API_KEY=${HOPSWORKS_API_KEY}
+      - HOPSWORKS_PROJECT_NAME=${HOPSWORKS_PROJECT_NAME:-CryptoSentinel}
+      - TRAINING_INTERVAL_MINUTES=${TRAINING_INTERVAL_MINUTES:-30}
+      - PREDICTION_REFRESH_MINUTES=${PREDICTION_REFRESH_MINUTES:-5}
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Prefect Agent (optional - for local pipeline execution)
+  prefect-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: prefect agent start -q default
+    environment:
+      - HOPSWORKS_API_KEY=${HOPSWORKS_API_KEY}
+      - HOPSWORKS_PROJECT_NAME=${HOPSWORKS_PROJECT_NAME:-CryptoSentinel}
+      - PREFECT_API_URL=${PREFECT_API_URL:-}
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+    restart: unless-stopped
+    profiles:
+      - with-prefect
+
+volumes:
+  models:
+  data:
+

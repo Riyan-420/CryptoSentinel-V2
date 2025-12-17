@@ -1,0 +1,2 @@
+# CryptoSentinel App Module
+
