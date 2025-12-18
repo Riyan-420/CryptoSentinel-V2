@@ -1,0 +1,67 @@
+name: Deploy to Hugging Face Space
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  sync-to-hub:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install Python dependencies
+        run: pip install huggingface_hub
+      
+      - name: Verify project structure
+        run: |
+          echo "Checking project structure..."
+          ls -la
+          echo "Checking pages directory..."
+          ls -la pages/ || echo "No pages directory"
+          echo "Checking app directory..."
+          ls -la app/ || echo "No app directory"
+      
+      - name: Push to Hugging Face Hub
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python -c "
+          from huggingface_hub import HfApi
+          import os
+          
+          api = HfApi()
+          print('🚀 Starting upload to Hugging Face Space...')
+          
+          # Upload the entire project to the Space
+          api.upload_folder(
+              folder_path='.',
+              repo_id='${{ secrets.HF_REPO_ID }}',  # e.g., 'your-username/CryptoSentinel-V2'
+              repo_type='space',
+              token=os.environ['HF_TOKEN'],
+              ignore_patterns=[
+                  '.git', 
+                  '.github', 
+                  '__pycache__', 
+                  '*.pyc', 
+                  '.DS_Store', 
+                  'venv/',
+                  'models/active/*',  # Don't upload local models
+                  'models/saved/*',
+                  'data/*.parquet',   # Don't upload local data
+                  '.env',             # Don't upload secrets
+                  'terminals/'
+              ]
+          )
+          print('✅ Upload to Hugging Face complete!')
+          print('📱 Your app will be live at: https://huggingface.co/spaces/${{ secrets.HF_REPO_ID }}')
+          "
+
