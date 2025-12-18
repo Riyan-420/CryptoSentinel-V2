@@ -140,15 +140,36 @@ def generate_prediction(features: pd.DataFrame, current_price: float
         # Use best model prediction
         predicted_price = predictions.get(best_model, list(predictions.values())[0])
         
-        # Direction from classifier if available
+        # Direction based on price comparison (PRIMARY METHOD - always correct)
+        # If predicted_price > current_price, price goes UP
+        # If predicted_price < current_price, price goes DOWN
+        direction = "up" if predicted_price > current_price else "down"
+        
+        # Calculate confidence based on price difference
+        price_diff_pct = abs(predicted_price - current_price) / current_price * 100
+        confidence = min(95, 50 + price_diff_pct * 10)
+        
+        # Optional: Use classifier as secondary validation (but don't override price-based direction)
         if "classifier" in model_loader.models:
-            direction_pred = model_loader.models["classifier"].predict(X_scaled)[0]
-            direction = "up" if direction_pred == 1 else "down"
-            direction_proba = model_loader.models["classifier"].predict_proba(X_scaled)
-            confidence = float(max(direction_proba[0])) * 100
-        else:
-            direction = "up" if predicted_price > current_price else "down"
-            confidence = min(95, 50 + abs(predicted_price - current_price) / current_price * 1000)
+            try:
+                classifier_pred = model_loader.models["classifier"].predict(X_scaled)[0]
+                classifier_direction = "up" if classifier_pred == 1 else "down"
+                direction_proba = model_loader.models["classifier"].predict_proba(X_scaled)
+                classifier_confidence = float(max(direction_proba[0])) * 100
+                
+                # Log if classifier disagrees with price-based direction (for debugging)
+                if classifier_direction != direction:
+                    logger.warning(
+                        f"Classifier disagrees with price prediction: "
+                        f"price says {direction} (${predicted_price:.2f} vs ${current_price:.2f}), "
+                        f"classifier says {classifier_direction} ({classifier_confidence:.1f}% confidence)"
+                    )
+                
+                # Use classifier confidence if it's higher and agrees with price direction
+                if classifier_direction == direction and classifier_confidence > confidence:
+                    confidence = classifier_confidence
+            except Exception as e:
+                logger.warning(f"Classifier prediction failed: {e}, using price-based direction")
         
         # Market regime from K-Means if available
         regime = "neutral"
