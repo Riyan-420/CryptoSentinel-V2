@@ -2,8 +2,8 @@ name: Feature Pipeline
 
 on:
   schedule:
-    # Run every 30 minutes
-    - cron: '*/30 * * * *'
+    # Run every 5 minutes (to keep features fresh for inference)
+    - cron: '*/5 * * * *'
   workflow_dispatch:
     inputs:
       hours:

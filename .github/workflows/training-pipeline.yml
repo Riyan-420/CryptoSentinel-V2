@@ -2,8 +2,8 @@ name: Training Pipeline
 
 on:
   schedule:
-    # Run every 30 minutes (offset by 15 minutes from feature pipeline)
-    - cron: '15,45 * * * *'
+    # Run every 30 minutes (offset by 1 minute from feature pipeline to ensure features are ready)
+    - cron: '16,46 * * * *'
   workflow_dispatch:
 
 env:
