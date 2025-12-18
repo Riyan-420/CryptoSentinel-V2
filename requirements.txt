@@ -20,6 +20,7 @@ prefect>=2.14.0
 
 # Feature Store & Model Registry
 hopsworks>=4.0.0
+confluent-kafka>=2.12.0
 
 # Explainability
 shap>=0.43.0
