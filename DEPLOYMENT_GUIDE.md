@@ -282,3 +282,4 @@ docker run -p 7860:7860 --env-file .env cryptosentinel
 
 **Need Help?** Check logs in each service's dashboard or create an issue on GitHub!
 
+

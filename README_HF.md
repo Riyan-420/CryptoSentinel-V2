@@ -40,3 +40,4 @@ Real-time Bitcoin price prediction with Machine Learning, featuring:
 
 [GitHub Repository](https://github.com/Riyan-420/CryptoSentinel-V2)
 
+
