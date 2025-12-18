@@ -38,8 +38,9 @@ class Settings(BaseSettings):
     N_THREADS: int = int(os.getenv("OMP_NUM_THREADS", "4"))
     
     # Hopsworks
-    HOPSWORKS_API_KEY: str = os.getenv("HOPSWORKS_API_KEY", "")
-    HOPSWORKS_PROJECT_NAME: str = os.getenv("HOPSWORKS_PROJECT_NAME", "CryptoSentinel")
+    # Try Prefect variables first (when running in Prefect), then env vars
+    HOPSWORKS_API_KEY: str = ""
+    HOPSWORKS_PROJECT_NAME: str = "CryptoSentinel"
     
     # Notifications
     DISCORD_WEBHOOK_URL: str = os.getenv("DISCORD_WEBHOOK_URL", "")
@@ -53,6 +54,28 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# Load Prefect variables if available (when running in Prefect context)
+try:
+    from prefect import variables
+    hopsworks_key = variables.get("hopsworks_api_key", default=None)
+    hopsworks_project = variables.get("hopsworks_project_name", default=None)
+    
+    if hopsworks_key:
+        settings.HOPSWORKS_API_KEY = hopsworks_key
+    elif not settings.HOPSWORKS_API_KEY:
+        settings.HOPSWORKS_API_KEY = os.getenv("HOPSWORKS_API_KEY", "")
+    
+    if hopsworks_project:
+        settings.HOPSWORKS_PROJECT_NAME = hopsworks_project
+    elif settings.HOPSWORKS_PROJECT_NAME == "CryptoSentinel":
+        settings.HOPSWORKS_PROJECT_NAME = os.getenv("HOPSWORKS_PROJECT_NAME", "CryptoSentinel")
+except Exception:
+    # Not in Prefect context, use environment variables
+    if not settings.HOPSWORKS_API_KEY:
+        settings.HOPSWORKS_API_KEY = os.getenv("HOPSWORKS_API_KEY", "")
+    if settings.HOPSWORKS_PROJECT_NAME == "CryptoSentinel":
+        settings.HOPSWORKS_PROJECT_NAME = os.getenv("HOPSWORKS_PROJECT_NAME", "CryptoSentinel")
 
 # Create directories
 settings.MODEL_DIR.mkdir(parents=True, exist_ok=True)
