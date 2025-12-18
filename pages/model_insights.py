@@ -215,14 +215,101 @@ def render():
                         <p><strong>Model Version:</strong> {metadata.get('version', 'N/A')}</p>
                         <p><strong>Created:</strong> {metadata.get('created_at', 'N/A')}</p>
                         <p><strong>Best Model:</strong> {metadata.get('best_model', 'N/A')}</p>
+                        <p><strong>Training Samples:</strong> {metadata.get('training_samples', 'N/A')}</p>
                     </div>
                 """, unsafe_allow_html=True)
                 
+                st.markdown("---")
+                
+                # Model metrics comparison
+                metrics = metadata.get('metrics', {})
+                
+                if metrics:
+                    st.markdown("### Model Performance Metrics")
+                    st.markdown("*Lower RMSE and MAE are better. Higher R² is better.*")
+                    
+                    # Create comparison DataFrame
+                    comparison_data = []
+                    regression_models = ['xgboost', 'random_forest', 'gradient_boosting', 'ridge']
+                    
+                    for model_name in regression_models:
+                        if model_name in metrics:
+                            model_metrics = metrics[model_name]
+                            comparison_data.append({
+                                'Model': model_name.replace('_', ' ').title(),
+                                'RMSE': f"{model_metrics.get('rmse', 0):.2f}",
+                                'MAE': f"{model_metrics.get('mae', 0):.2f}",
+                                'R²': f"{model_metrics.get('r2', 0):.4f}",
+                                'Best': '✅' if model_name == model_loader.best_model_name else ''
+                            })
+                    
+                    if comparison_data:
+                        df_comparison = pd.DataFrame(comparison_data)
+                        
+                        # Display as table with styling
+                        st.dataframe(
+                            df_comparison,
+                            use_container_width=True,
+                            hide_index=True
+                        )
+                        
+                        # Visual comparison - RMSE
+                        st.markdown("---")
+                        st.markdown("### RMSE Comparison (Lower is Better)")
+                        
+                        rmse_data = []
+                        for model_name in regression_models:
+                            if model_name in metrics:
+                                rmse_data.append({
+                                    'Model': model_name.replace('_', ' ').title(),
+                                    'RMSE': metrics[model_name].get('rmse', 0),
+                                    'is_best': model_name == model_loader.best_model_name
+                                })
+                        
+                        if rmse_data:
+                            df_rmse = pd.DataFrame(rmse_data)
+                            colors = ['#22c55e' if row['is_best'] else '#6366f1' 
+                                     for _, row in df_rmse.iterrows()]
+                            
+                            fig_rmse = go.Figure(go.Bar(
+                                x=df_rmse['Model'],
+                                y=df_rmse['RMSE'],
+                                marker_color=colors,
+                                text=df_rmse['RMSE'].round(2),
+                                textposition='auto'
+                            ))
+                            
+                            fig_rmse.update_layout(
+                                plot_bgcolor='rgba(0,0,0,0)',
+                                paper_bgcolor='rgba(0,0,0,0)',
+                                font=dict(color='#e2e8f0'),
+                                yaxis_title="RMSE (Root Mean Squared Error)",
+                                xaxis_title=None,
+                                height=400,
+                                showlegend=False
+                            )
+                            
+                            st.plotly_chart(fig_rmse, use_container_width=True)
+                            
+                            best_model_metrics = metrics.get(model_loader.best_model_name, {})
+                            st.success(f"""
+                                **{model_loader.best_model_name.replace('_', ' ').title()}** was selected as the best model with:
+                                - RMSE: ${best_model_metrics.get('rmse', 0):,.2f}
+                                - MAE: ${best_model_metrics.get('mae', 0):,.2f}
+                                - R²: {best_model_metrics.get('r2', 0):.4f}
+                            """)
+                    else:
+                        st.info("No regression model metrics available.")
+                else:
+                    st.info("No metrics available. Please run training pipeline.")
+                
+                st.markdown("---")
+                
                 # Model list
-                st.markdown("**Loaded Models:**")
+                st.markdown("### Loaded Models")
                 for name in model_loader.models.keys():
                     model_type = type(model_loader.models[name]).__name__
-                    is_best = " (Best)" if name == model_loader.best_model_name else ""
+                    is_best = " 🏆" if name == model_loader.best_model_name else ""
                     st.markdown(f"- **{name}**: {model_type}{is_best}")
             
         except Exception as e:
