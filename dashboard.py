@@ -144,6 +144,24 @@ st.markdown("""
     /* Hide Streamlit branding */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
+    
+    /* Hide Streamlit's automatic page navigation (we use custom radio buttons) */
+    /* Target the nav element that contains automatic page links */
+    section[data-testid="stSidebar"] nav:first-of-type {
+        display: none !important;
+    }
+    
+    /* Hide any navigation container above our custom navigation */
+    [data-testid="stSidebarNav"] {
+        display: none !important;
+    }
+    
+    /* Hide navigation links that appear as text above CryptoSentinel */
+    .css-1d391kg,
+    .css-1lcbmhc,
+    [class*="stSidebarNav"] {
+        display: none !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
