@@ -27,6 +27,15 @@ def render():
             - Positive values push the prediction higher
             - Negative values push it lower
             - The magnitude indicates the strength of the contribution
+            - Based on game theory (Shapley values)
+            
+            **LIME (Local Interpretable Model-agnostic Explanations):**
+            
+            LIME explains individual predictions by approximating the model locally.
+            - Shows which features matter most for a specific prediction
+            - Works with any model type (model-agnostic)
+            - Provides local explanations around a single instance
+            - Useful for understanding "why this specific prediction?"
             
             **Feature Importance:**
             
@@ -67,7 +76,7 @@ def render():
     st.markdown("---")
     
     # Tabs for different insights
-    tab1, tab2, tab3 = st.tabs(["SHAP Analysis", "Feature Importance", "Model Comparison"])
+    tab1, tab2, tab3, tab4 = st.tabs(["SHAP Analysis", "LIME Explanation", "Feature Importance", "Model Comparison"])
     
     with tab1:
         st.subheader("SHAP Values")
@@ -131,6 +140,85 @@ def render():
             st.error(f"Error calculating SHAP values: {e}")
     
     with tab2:
+        st.subheader("LIME Explanation")
+        
+        try:
+            from app.data_fetcher import fetch_price_history
+            from app.feature_engineering import engineer_features
+            from app.explainer import get_lime_explanation
+            
+            with st.spinner("Calculating LIME explanation..."):
+                history = fetch_price_history(hours=6)
+                features = engineer_features(history)
+                lime_data = get_lime_explanation(features, selected_model)
+            
+            if lime_data:
+                # Top features bar chart
+                top_features = lime_data.get('top_features', [])
+                
+                if top_features:
+                    df = pd.DataFrame(top_features)
+                    
+                    # Color based on positive/negative impact
+                    colors = ['#22c55e' if v > 0 else '#ef4444' for v in df['importance']]
+                    
+                    fig = go.Figure(go.Bar(
+                        x=df['importance'],
+                        y=df['feature'],
+                        orientation='h',
+                        marker_color=colors
+                    ))
+                    
+                    fig.update_layout(
+                        title="Feature Contributions (LIME)",
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        font=dict(color='#e2e8f0'),
+                        xaxis_title="LIME Value (Local Impact on Prediction)",
+                        yaxis_title=None,
+                        height=400,
+                        margin=dict(l=0, r=0, t=40, b=0)
+                    )
+                    fig.update_yaxes(autorange="reversed")
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Prediction info
+                    st.markdown("---")
+                    st.markdown(f"""
+                        <div class="info-box">
+                            <p><strong>Prediction Value:</strong> ${lime_data.get('prediction', 0):,.2f}</p>
+                            <p><strong>Model:</strong> {lime_data.get('model_name', 'N/A')}</p>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Interpretation
+                    st.markdown("**Interpretation:**")
+                    positive_features = [f for f in top_features if f['importance'] > 0]
+                    negative_features = [f for f in top_features if f['importance'] < 0]
+                    
+                    if positive_features:
+                        st.markdown(f"- Features pushing price **higher**: {', '.join([f['feature'] for f in positive_features[:3]])}")
+                    if negative_features:
+                        st.markdown(f"- Features pushing price **lower**: {', '.join([f['feature'] for f in negative_features[:3]])}")
+                    
+                    # Comparison with SHAP
+                    st.markdown("---")
+                    st.markdown("**LIME vs SHAP:**")
+                    st.markdown("""
+                        - **SHAP**: Global explanation based on Shapley values (game theory)
+                        - **LIME**: Local explanation for this specific prediction
+                        - Both methods complement each other for comprehensive model understanding
+                    """)
+                else:
+                    st.info("No LIME values available for this model.")
+            else:
+                st.warning("Could not calculate LIME explanation.")
+                
+        except Exception as e:
+            st.error(f"Error calculating LIME explanation: {e}")
+    
+    with tab3:
         st.subheader("Feature Importance")
         
         try:
@@ -203,7 +291,7 @@ def render():
         except Exception as e:
             st.error(f"Error getting feature importance: {e}")
     
-    with tab3:
+    with tab4:
         st.subheader("Model Comparison")
         
         try:

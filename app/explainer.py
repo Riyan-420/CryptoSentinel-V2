@@ -1,10 +1,11 @@
-"""Model Explainability - SHAP and Feature Importance"""
+"""Model Explainability - SHAP, LIME, and Feature Importance"""
 import logging
 from typing import Dict, Any, List, Optional
 
 import numpy as np
 import pandas as pd
 import shap
+from lime.lime_tabular import LimeTabularExplainer
 
 from app.predictor import model_loader, ensure_models_loaded
 from app.feature_engineering import get_feature_names
@@ -105,18 +106,99 @@ def get_feature_importance(model_name: Optional[str] = None
         return None
 
 
+def get_lime_explanation(features: pd.DataFrame, model_name: Optional[str] = None,
+                         num_features: int = 10) -> Optional[Dict[str, Any]]:
+    """Calculate LIME explanation for a single prediction"""
+    if not ensure_models_loaded():
+        return None
+    
+    try:
+        if model_name is None:
+            model_name = model_loader.best_model_name
+        
+        model = model_loader.models.get(model_name)
+        if model is None:
+            logger.warning(f"Model {model_name} not found")
+            return None
+        
+        feature_cols = get_feature_names()
+        X = features[feature_cols].copy()
+        
+        # Prepare training data for LIME (use unscaled data - LIME will handle sampling)
+        # LIME needs to sample from the original feature space
+        X_train = X.values
+        
+        # Create LIME explainer with unscaled training data
+        explainer = LimeTabularExplainer(
+            X_train,
+            feature_names=feature_cols,
+            mode='regression',
+            discretize_continuous=True
+        )
+        
+        # Get the instance to explain (most recent)
+        instance = X.values[-1:]
+        
+        # Create prediction function that handles scaling
+        def predict_fn(x):
+            """Prediction function for LIME - handles scaling if needed"""
+            if model_loader.scaler:
+                # Scale the input before prediction
+                return model.predict(model_loader.scaler.transform(x))
+            else:
+                return model.predict(x)
+        
+        # Get explanation
+        explanation = explainer.explain_instance(
+            instance[0],
+            predict_fn,
+            num_features=num_features
+        )
+        
+        # Extract feature contributions
+        explanation_list = explanation.as_list()
+        
+        # Sort by absolute value
+        explanation_list.sort(key=lambda x: abs(x[1]), reverse=True)
+        
+        top_features = [
+            {"feature": f, "importance": round(float(v), 4)}
+            for f, v in explanation_list[:num_features]
+        ]
+        
+        # Get prediction value
+        prediction = model.predict(instance)[0]
+        
+        return {
+            "model_name": model_name,
+            "feature_names": feature_cols,
+            "top_features": top_features,
+            "prediction": float(prediction),
+            "explanation_text": explanation.as_list()
+        }
+        
+    except Exception as e:
+        logger.error(f"LIME calculation error: {e}", exc_info=True)
+        return None
+
+
 def get_model_explanation_summary(features: pd.DataFrame
                                  ) -> Dict[str, Any]:
     """Get comprehensive model explanation"""
     shap_data = get_shap_values(features)
+    lime_data = get_lime_explanation(features)
     importance = get_feature_importance()
     
-    if shap_data is None and importance is None:
+    if shap_data is None and lime_data is None and importance is None:
         return {"error": "Could not generate explanations"}
     
     top_shap = []
     if shap_data:
         top_shap = shap_data.get("top_features", [])[:5]
+    
+    top_lime = []
+    if lime_data:
+        top_lime = lime_data.get("top_features", [])[:5]
     
     top_importance = []
     if importance:
@@ -127,16 +209,18 @@ def get_model_explanation_summary(features: pd.DataFrame
     
     return {
         "shap_top_features": top_shap,
+        "lime_top_features": top_lime,
         "importance_top_features": top_importance,
         "model_used": model_loader.best_model_name,
-        "explanation": _generate_explanation_text(top_shap, top_importance)
+        "explanation": _generate_explanation_text(top_shap, top_lime, top_importance)
     }
 
 
-def _generate_explanation_text(shap_features: List[Dict], 
+def _generate_explanation_text(shap_features: List[Dict],
+                               lime_features: List[Dict],
                                importance_features: List[Dict]) -> str:
     """Generate human-readable explanation"""
-    if not shap_features and not importance_features:
+    if not shap_features and not lime_features and not importance_features:
         return "No explanation available."
     
     parts = []
@@ -145,8 +229,14 @@ def _generate_explanation_text(shap_features: List[Dict],
         top = shap_features[0]
         direction = "increasing" if top["importance"] > 0 else "decreasing"
         parts.append(
-            f"The most influential factor is **{top['feature']}**, "
-            f"which is {direction} the predicted price."
+            f"SHAP: **{top['feature']}** is {direction} the predicted price."
+        )
+    
+    if lime_features:
+        top = lime_features[0]
+        direction = "increasing" if top["importance"] > 0 else "decreasing"
+        parts.append(
+            f"LIME: **{top['feature']}** is {direction} the predicted price."
         )
     
     if importance_features:

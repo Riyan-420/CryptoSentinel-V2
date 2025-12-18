@@ -32,5 +32,3 @@ PREFECT TRAINING PIPELINE (Using Prefect flow)
 PREFECT INFERENCE PIPELINE (Using Prefect flow)
 .\venv\Scripts\python.exe -m pipelines.inference_pipeline
 
-DEPLOY TO PREFECT CLOUD
-.\venv\Scripts\python.exe deploy_prefect_pipelines.py

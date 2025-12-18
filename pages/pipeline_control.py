@@ -18,7 +18,7 @@ def render():
                - Fetches price data from CoinGecko API
                - Engineers technical indicators (RSI, MACD, Bollinger Bands, etc.)
                - Stores features in Hopsworks Feature Store
-               - *Runs every 30 minutes via GitHub Actions*
+               - *Runs every 5 minutes via GitHub Actions*
             
             2. **Training Pipeline**
                - Loads features from Feature Store
@@ -31,7 +31,7 @@ def render():
                - Generates real-time predictions
                - Validates past predictions
                - Checks for alerts
-               - *Runs every 5 minutes via scheduler*
+               - *Runs every 5 minutes via FastAPI scheduler (local) or Streamlit scheduler (Hugging Face)*
         """)
     
     # Background scheduler status
