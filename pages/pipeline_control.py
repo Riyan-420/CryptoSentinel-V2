@@ -34,6 +34,32 @@ def render():
                - *Runs every 5 minutes via scheduler*
         """)
     
+    # Background scheduler status
+    try:
+        from app.scheduler import get_scheduler_status
+        scheduler_status = get_scheduler_status()
+        
+        st.subheader("Background Scheduler")
+        if scheduler_status["running"]:
+            st.success("Background scheduler is running")
+            col1, col2 = st.columns(2)
+            with col1:
+                if scheduler_status["last_feature_run"]:
+                    st.info(f"Last feature run: {scheduler_status['last_feature_run']}")
+                else:
+                    st.info("Feature pipeline: Not run yet")
+            with col2:
+                if scheduler_status["last_training_run"]:
+                    st.info(f"Last training run: {scheduler_status['last_training_run']}")
+                else:
+                    st.info("Training pipeline: Not run yet")
+        else:
+            st.warning("Background scheduler is not running")
+    except ImportError:
+        st.info("Background scheduler not available")
+    
+    st.markdown("---")
+    
     # Pipeline status
     st.subheader("Pipeline Status")
     

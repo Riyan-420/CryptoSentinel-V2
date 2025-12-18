@@ -1,6 +1,17 @@
 """CryptoSentinel - Streamlit Dashboard"""
 import streamlit as st
 from datetime import datetime
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+try:
+    from app.scheduler import start_scheduler, get_scheduler_status
+    scheduler_available = True
+except ImportError:
+    scheduler_available = False
+    logger.warning("Scheduler not available")
 
 # Page config
 st.set_page_config(
@@ -139,6 +150,15 @@ st.markdown("""
 
 def main():
     """Main dashboard entry point"""
+    if scheduler_available:
+        if 'scheduler_started' not in st.session_state:
+            try:
+                start_scheduler()
+                st.session_state.scheduler_started = True
+                logger.info("Background scheduler started")
+            except Exception as e:
+                logger.error(f"Failed to start scheduler: {e}")
+    
     # Sidebar navigation
     with st.sidebar:
         st.markdown('<h2 style="color: #a855f7;">CryptoSentinel</h2>', unsafe_allow_html=True)
