@@ -10,6 +10,7 @@ on:
         description: 'Hours of history to fetch'
         required: false
         default: '24'
+  # Scheduled runs activate after first successful run
 
 env:
   PYTHON_VERSION: '3.11'
