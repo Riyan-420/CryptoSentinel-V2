@@ -101,7 +101,15 @@ def render():
     st.subheader("Prediction History")
     
     try:
-        from app.predictor import get_prediction_history, get_prediction_accuracy
+        from app.predictor import get_prediction_history, get_prediction_accuracy, validate_predictions
+        from app.data_fetcher import fetch_current_price
+        
+        # Validate predictions before displaying
+        try:
+            current = fetch_current_price()
+            validate_predictions(current['current_price'])
+        except Exception as e:
+            st.warning(f"Could not validate predictions: {e}")
         
         history = get_prediction_history()
         

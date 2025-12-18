@@ -158,8 +158,13 @@ def generate_prediction(features: pd.DataFrame, current_price: float
             regimes = ["accumulation", "uptrend", "distribution", "downtrend"]
             regime = regimes[cluster % len(regimes)]
         
+        prediction_time = datetime.now()
+        target_time = prediction_time + timedelta(minutes=settings.PREDICTION_MINUTES)
+        
         result = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": prediction_time.isoformat(),
+            "target_timestamp": target_time.isoformat(),
+            "target_timestamp_ms": int(target_time.timestamp() * 1000),
             "current_price": round(current_price, 2),
             "predicted_price": round(predicted_price, 2),
             "predicted_direction": direction,
@@ -194,36 +199,77 @@ def _store_prediction(prediction: Dict[str, Any]):
     prediction_history.append(entry)
 
 
-def validate_predictions(current_price: float):
-    """Validate past predictions with tolerance-based correctness"""
-    now = datetime.now()
+def validate_predictions(current_price: float = None):
+    """Validate past predictions by checking if we have data for their target time"""
+    from app.data_fetcher import fetch_price_history
+    
     tolerance_pct = settings.DIRECTION_TOLERANCE_PCT
+    now = datetime.now()
+    
+    # Fetch recent price history to check target times
+    try:
+        history_hours = max(2, settings.PREDICTION_MINUTES / 60 + 1)
+        price_history = fetch_price_history(hours=int(history_hours))
+        price_dict = {p["timestamp"]: p["price"] for p in price_history}
+    except Exception as e:
+        logger.warning(f"Could not fetch price history for validation: {e}")
+        if current_price is None:
+            return
+        price_dict = {}
     
     for entry in prediction_history:
         if entry["was_correct"] is not None:
             continue
         
-        pred_time = datetime.fromisoformat(entry["timestamp"])
-        if now - pred_time < timedelta(minutes=settings.PREDICTION_MINUTES):
-            continue
+        # Get target time for this prediction
+        target_timestamp_ms = entry.get("target_timestamp_ms")
+        if not target_timestamp_ms:
+            # Fallback for old predictions without target_timestamp
+            try:
+                pred_time = datetime.fromisoformat(entry["timestamp"].replace('Z', '+00:00'))
+            except (ValueError, AttributeError):
+                try:
+                    pred_time = datetime.fromisoformat(entry["timestamp"])
+                except:
+                    continue
+            pred_time = pred_time.replace(tzinfo=None) if pred_time.tzinfo else pred_time
+            target_time = pred_time + timedelta(minutes=settings.PREDICTION_MINUTES)
+            target_timestamp_ms = int(target_time.timestamp() * 1000)
         
-        entry["actual_price"] = round(current_price, 2)
+        # Check if we have price data for the target time (within 5 minute window)
+        actual_price = None
+        for hist_ts, hist_price in price_dict.items():
+            time_diff_ms = abs(hist_ts - target_timestamp_ms)
+            if time_diff_ms <= 5 * 60 * 1000:  # 5 minute window
+                actual_price = hist_price
+                break
+        
+        # If no history match, use current price as fallback (if target time has passed)
+        if actual_price is None:
+            target_time = datetime.fromtimestamp(target_timestamp_ms / 1000)
+            if now >= target_time:
+                if current_price is not None:
+                    actual_price = current_price
+                else:
+                    continue
+            else:
+                continue  # Target time hasn't arrived yet
+        
+        # Validate the prediction
+        entry["actual_price"] = round(actual_price, 2)
         entry["validated_at"] = now.isoformat()
         
         price_at_prediction = entry["current_price"]
         predicted_direction = entry["predicted_direction"]
+        predicted_price = entry["predicted_price"]
         
-        # Calculate actual change
-        actual_change = current_price - price_at_prediction
+        # Calculate actual change from prediction time to target time
+        actual_change = actual_price - price_at_prediction
         actual_change_pct = abs(actual_change / price_at_prediction * 100)
         
-        entry["error_amount"] = round(
-            abs(entry["predicted_price"] - current_price), 2
-        )
+        entry["error_amount"] = round(abs(predicted_price - actual_price), 2)
         
         # TOLERANCE-BASED VALIDATION
-        # If price moved less than tolerance, consider it "neutral" - mark as incorrect
-        # This prevents marking sideways movements as correct predictions
         if actual_change_pct < tolerance_pct:
             entry["was_correct"] = False
             entry["validation_note"] = "price_within_tolerance"
@@ -233,8 +279,10 @@ def validate_predictions(current_price: float):
             entry["validation_note"] = "direction_validated"
         
         logger.info(
-            f"Validated prediction: predicted={predicted_direction}, "
-            f"actual_change={actual_change_pct:.2f}%, correct={entry['was_correct']}"
+            f"Validated prediction from {entry['timestamp'][:19]}: "
+            f"predicted={predicted_direction} to ${predicted_price:,.2f}, "
+            f"actual at target time=${actual_price:,.2f}, "
+            f"change={actual_change_pct:.2f}%, correct={entry['was_correct']}"
         )
 
 
