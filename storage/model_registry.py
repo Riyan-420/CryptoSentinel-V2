@@ -26,12 +26,12 @@ def _connect():
     try:
         import hopsworks
         
+        # Project-specific API keys don't need project parameter
         _connection = hopsworks.login(
-            api_key_value=settings.HOPSWORKS_API_KEY,
-            project=settings.HOPSWORKS_PROJECT_NAME
+            api_key_value=settings.HOPSWORKS_API_KEY
         )
         _model_registry = _connection.get_model_registry()
-        logger.info("Connected to Hopsworks Model Registry")
+        logger.info(f"Connected to Hopsworks Model Registry (Project: {_connection.name})")
         return _model_registry
         
     except Exception as e:

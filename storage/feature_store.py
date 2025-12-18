@@ -24,12 +24,12 @@ def _connect():
     try:
         import hopsworks
         
+        # Project-specific API keys don't need project parameter
         _connection = hopsworks.login(
-            api_key_value=settings.HOPSWORKS_API_KEY,
-            project=settings.HOPSWORKS_PROJECT_NAME
+            api_key_value=settings.HOPSWORKS_API_KEY
         )
         _feature_store = _connection.get_feature_store()
-        logger.info("Connected to Hopsworks Feature Store")
+        logger.info(f"Connected to Hopsworks Feature Store (Project: {_connection.name})")
         return _feature_store
         
     except Exception as e:
