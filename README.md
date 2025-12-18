@@ -1,3 +1,14 @@
+---
+title: CryptoSentinel V2
+emoji: 💰
+colorFrom: purple
+colorTo: blue
+sdk: docker
+app_port: 7860
+pinned: false
+license: mit
+---
+
 # CryptoSentinel - Bitcoin Price Prediction
 
 Streamlit-based ML system for Bitcoin price prediction with automated drift detection and model retraining.
