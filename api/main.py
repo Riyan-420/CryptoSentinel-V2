@@ -10,6 +10,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.config import settings
 from api.routes import router
 from pipelines.inference_pipeline import inference_pipeline
+from pipelines.training_pipeline import training_pipeline
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,6 +32,16 @@ def run_scheduled_prediction():
         logger.error(f"Scheduled prediction error: {e}")
 
 
+def run_scheduled_training():
+    """Run training pipeline on schedule"""
+    try:
+        logger.info("Running scheduled training")
+        result = training_pipeline()
+        logger.info(f"Training complete: Best model = {result.get('best_model', 'N/A')}")
+    except Exception as e:
+        logger.error(f"Scheduled training error: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events"""
@@ -45,7 +56,8 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning("No models loaded - run training pipeline first")
     
-    # Start scheduler
+    # Start schedulers
+    # Inference pipeline - every 5 minutes
     scheduler.add_job(
         run_scheduled_prediction,
         "interval",
@@ -53,8 +65,20 @@ async def lifespan(app: FastAPI):
         id="prediction_job",
         next_run_time=datetime.now()
     )
+    
+    # Training pipeline - every 30 minutes
+    scheduler.add_job(
+        run_scheduled_training,
+        "interval",
+        minutes=settings.TRAINING_INTERVAL_MINUTES,
+        id="training_job",
+        next_run_time=datetime.now()
+    )
+    
     scheduler.start()
-    logger.info(f"Scheduler started (every {settings.PREDICTION_REFRESH_MINUTES} min)")
+    logger.info(f"Scheduler started:")
+    logger.info(f"  - Inference pipeline: every {settings.PREDICTION_REFRESH_MINUTES} min")
+    logger.info(f"  - Training pipeline: every {settings.TRAINING_INTERVAL_MINUTES} min")
     
     yield
     
