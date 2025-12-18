@@ -67,7 +67,7 @@ def get_or_create_feature_group(name: str = "crypto_features",
 
 def store_features(df: pd.DataFrame, 
                    feature_group_name: str = "crypto_features") -> bool:
-    """Store features in Hopsworks"""
+    """Store features in Hopsworks - only inserts NEW timestamps"""
     fg = get_or_create_feature_group(feature_group_name)
     
     if fg is None:
@@ -78,14 +78,54 @@ def store_features(df: pd.DataFrame,
         # Ensure timestamp column exists
         if 'timestamp' not in df.columns:
             df = df.reset_index()
-            df.rename(columns={'index': 'timestamp'}, inplace=True)
+            if 'index' in df.columns:
+                df.rename(columns={'index': 'timestamp'}, inplace=True)
+        
+        # Ensure timestamp is datetime
+        if not pd.api.types.is_datetime64_any_dtype(df['timestamp']):
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+        
+        # Get existing timestamps from feature store to avoid duplicates
+        # Only check recent data (last 2000 rows) for efficiency
+        try:
+            # Read only the most recent rows to check for duplicates
+            existing_df = fg.read(online=False, limit=2000)
+            
+            if existing_df is not None and len(existing_df) > 0:
+                # Convert existing timestamps to datetime for comparison
+                if 'timestamp' in existing_df.columns:
+                    existing_df['timestamp'] = pd.to_datetime(existing_df['timestamp'])
+                    # Floor to minute for comparison (CoinGecko data is minute-level)
+                    existing_timestamps = set(existing_df['timestamp'].dt.floor('T'))
+                    
+                    # Filter to only NEW timestamps (not already in feature store)
+                    df['timestamp_floor'] = df['timestamp'].dt.floor('T')
+                    new_df = df[~df['timestamp_floor'].isin(existing_timestamps)].copy()
+                    new_df = new_df.drop(columns=['timestamp_floor'])
+                    
+                    if len(new_df) == 0:
+                        logger.info("No new timestamps to insert (all data already exists)")
+                        return True
+                    
+                    logger.info(f"Filtered: {len(df)} -> {len(new_df)} new rows to insert")
+                    df = new_df
+                else:
+                    logger.warning("Existing data has no timestamp column, inserting all rows")
+            else:
+                logger.info("No existing data found, inserting all rows")
+        except Exception as e:
+            logger.warning(f"Could not check existing timestamps: {e}. Inserting all rows.")
+        
+        if len(df) == 0:
+            logger.info("No new data to insert")
+            return True
         
         # Convert timestamp to string for Hopsworks
-        if pd.api.types.is_datetime64_any_dtype(df['timestamp']):
-            df['timestamp'] = df['timestamp'].astype(str)
+        df['timestamp'] = df['timestamp'].astype(str)
         
-        fg.insert(df)
-        logger.info(f"Stored {len(df)} rows in Feature Store")
+        # Insert only new data
+        fg.insert(df, wait=True)
+        logger.info(f"Successfully stored {len(df)} NEW rows in Feature Store")
         return True
         
     except Exception as e:
