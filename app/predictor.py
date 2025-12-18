@@ -86,7 +86,7 @@ def ensure_models_loaded() -> bool:
         
         hw_model_data = get_latest_model()
         if hw_model_data and hw_model_data.get("models"):
-        model_loader.models = hw_model_data.get("models", {})
+            model_loader.models = hw_model_data.get("models", {})
             model_loader.scaler = hw_model_data.get("scaler")
             model_loader.metadata = hw_model_data.get("metadata", {})
             model_loader._loaded = bool(model_loader.models)
