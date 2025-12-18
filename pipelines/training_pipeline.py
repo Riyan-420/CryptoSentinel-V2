@@ -41,7 +41,7 @@ def check_drift_task(features_df):
     drift_report = detect_drift(features_df, available_cols)
     
     if drift_report.get('drift_detected'):
-        logger.warning(f"⚠️  Drift detected! Score: {drift_report.get('drift_score', 0):.4f}")
+        logger.warning(f"Drift detected! Score: {drift_report.get('drift_score', 0):.4f}")
     else:
         logger.info(f"✓ No drift detected. Score: {drift_report.get('drift_score', 0):.4f}")
     

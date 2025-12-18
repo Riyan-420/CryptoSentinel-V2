@@ -19,10 +19,10 @@ try:
     feature_result = feature_pipeline()
     
     if not feature_result.get('success'):
-        print("\n❌ Feature pipeline failed!")
+        print("\nFeature pipeline failed!")
         sys.exit(1)
     
-    print(f"\n✅ Feature pipeline complete!")
+    print(f"\nFeature pipeline complete!")
     print(f"   - Rows processed: {feature_result.get('rows_processed', 0)}")
     print(f"   - Duration: {feature_result.get('duration_seconds', 0):.2f}s")
     
@@ -35,7 +35,7 @@ try:
     from pipelines.training_pipeline import training_pipeline
     training_result = training_pipeline()
     
-    print(f"\n✅ Training pipeline complete!")
+    print(f"\nTraining pipeline complete!")
     print(f"   - Best model: {training_result.get('best_model', 'N/A')}")
     print(f"   - Samples trained: {training_result.get('samples_trained', 0)}")
     print(f"   - Duration: {training_result.get('duration_seconds', 0):.2f}s")
@@ -57,7 +57,7 @@ try:
     from pipelines.inference_pipeline import inference_pipeline
     inference_result = inference_pipeline()
     
-    print(f"\n✅ Inference pipeline complete!")
+    print(f"\nInference pipeline complete!")
     print(f"   - Current price: ${inference_result.get('current_price', 0):,.2f}")
     
     prediction = inference_result.get('prediction', {})
@@ -86,16 +86,16 @@ try:
     print(f"Completed at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("="*70 + "\n")
     
-    print("✨ CryptoSentinel is ready!")
+    print("CryptoSentinel is ready!")
     print("   Run: streamlit run dashboard.py")
     print()
 
 except KeyboardInterrupt:
-    print("\n\n⚠️  Pipeline execution interrupted by user")
+    print("\n\nPipeline execution interrupted by user")
     sys.exit(130)
     
 except Exception as e:
-    print(f"\n\n❌ Pipeline execution failed!")
+    print(f"\n\nPipeline execution failed!")
     print(f"Error: {e}")
     import traceback
     traceback.print_exc()

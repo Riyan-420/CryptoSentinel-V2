@@ -240,7 +240,7 @@ def render():
                                 'RMSE': f"{model_metrics.get('rmse', 0):.2f}",
                                 'MAE': f"{model_metrics.get('mae', 0):.2f}",
                                 'R²': f"{model_metrics.get('r2', 0):.4f}",
-                                'Best': '✅' if model_name == model_loader.best_model_name else ''
+                                'Best': 'YES' if model_name == model_loader.best_model_name else ''
                             })
                     
                     if comparison_data:

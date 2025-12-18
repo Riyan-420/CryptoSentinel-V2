@@ -33,10 +33,7 @@ jobs:
           HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
           HOPSWORKS_PROJECT_NAME: ${{ secrets.HOPSWORKS_PROJECT_NAME }}
         run: |
-          echo "🚀 Starting Training Pipeline..."
-          echo "HOPSWORKS_API_KEY is set: $([ -n "$HOPSWORKS_API_KEY" ] && echo 'YES' || echo 'NO')"
-          python run_training_pipeline.py
-          echo "✅ Training Pipeline completed!"
+          python -m pipelines.training_pipeline
       
       - name: Upload model artifacts
         uses: actions/upload-artifact@v4

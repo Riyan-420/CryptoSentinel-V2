@@ -96,12 +96,12 @@ def ensure_models_loaded() -> bool:
             model_loader._loaded = bool(model_loader.models)
             
             if model_loader._loaded:
-                logger.info(f"✅ Loaded {len(model_loader.models)} models from Hopsworks Model Registry")
+                logger.info(f"Loaded {len(model_loader.models)} models from Hopsworks Model Registry")
                 return True
     except Exception as e:
         logger.warning(f"Failed to load from Hopsworks: {e}")
     
-    logger.error("❌ Could not load models from local or Hopsworks")
+    logger.error("Could not load models from local or Hopsworks")
     return False
 
 

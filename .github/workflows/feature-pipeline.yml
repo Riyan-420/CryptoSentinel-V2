@@ -39,10 +39,7 @@ jobs:
           HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
           HOPSWORKS_PROJECT_NAME: ${{ secrets.HOPSWORKS_PROJECT_NAME }}
         run: |
-          echo "🚀 Starting Feature Pipeline..."
-          echo "HOPSWORKS_API_KEY is set: $([ -n "$HOPSWORKS_API_KEY" ] && echo 'YES' || echo 'NO')"
-          python run_feature_pipeline.py
-          echo "✅ Feature Pipeline completed!"
+          python -m pipelines.feature_pipeline
       
       - name: Notify on failure
         if: failure()

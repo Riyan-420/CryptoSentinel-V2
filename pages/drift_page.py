@@ -189,7 +189,7 @@ def render():
             st.info(report['message'])
         elif drift_detected:
             st.error(f"""
-                **⚠️ DRIFT DETECTED - Action Required**
+                **DRIFT DETECTED - Action Required**
                 
                 The current data distribution has significantly deviated from the training baseline.
                 
@@ -208,7 +208,7 @@ def render():
             """)
         else:
             st.success(f"""
-                **✅ NO DRIFT DETECTED - System Healthy**
+                **NO DRIFT DETECTED - System Healthy**
                 
                 The current data distribution is consistent with the training baseline.
                 
@@ -263,7 +263,7 @@ def render():
                         st.markdown("---")
                         if drift_result.get('drift_detected'):
                             st.error(f"""
-                                ⚠️ **DRIFT DETECTED!**
+                                **DRIFT DETECTED!**
                                 
                                 **Score:** {drift_result.get('drift_score', 0):.4f} (threshold: {drift_result.get('threshold', 0.3)})
                                 
@@ -273,7 +273,7 @@ def render():
                             """)
                         else:
                             st.success(f"""
-                                ✅ **NO DRIFT DETECTED**
+                                **NO DRIFT DETECTED**
                                 
                                 **Score:** {drift_result.get('drift_score', 0):.4f} (threshold: {drift_result.get('threshold', 0.3)})
                                 

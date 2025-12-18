@@ -4,8 +4,8 @@ from prefect.client.schemas.schedules import IntervalSchedule
 from pipelines.feature_pipeline import feature_pipeline
 from pipelines.training_pipeline import training_pipeline
 
-print("🚀 Deploying pipelines to Prefect Cloud...")
-print("📝 Creating deployments...\n")
+print("Deploying pipelines to Prefect Cloud...")
+print("Creating deployments...\n")
 
 # Create deployments with schedules using Prefect Cloud managed execution
 # (No work pool needed - runs on Prefect Cloud infrastructure)
@@ -27,19 +27,19 @@ training_deployment = training_pipeline.to_deployment(
 print("1️⃣ Deploying Feature Pipeline (every 5 min)...")
 try:
     feature_deployment.apply()
-    print("✅ Feature Pipeline deployed!")
+    print("Feature Pipeline deployed!")
 except Exception as e:
-    print(f"❌ Error deploying Feature Pipeline: {e}")
+    print(f"Error deploying Feature Pipeline: {e}")
 
 print("\n2️⃣ Deploying Training Pipeline (every 30 min)...")
 try:
     training_deployment.apply()
-    print("✅ Training Pipeline deployed!")
+    print("Training Pipeline deployed!")
 except Exception as e:
-    print(f"❌ Error deploying Training Pipeline: {e}")
+    print(f"Error deploying Training Pipeline: {e}")
 
 print("\n" + "="*70)
-print("🎉 DEPLOYMENT COMPLETE!")
+print("DEPLOYMENT COMPLETE!")
 print("="*70)
 print("\n📋 Next Steps:")
 print("1. View deployments in Prefect Cloud: https://app.prefect.cloud")
@@ -49,6 +49,6 @@ print("   OR use Prefect Cloud's managed execution")
 print("\n⏰ Schedules:")
 print("   • Feature Pipeline: Every 5 minutes")
 print("   • Training Pipeline: Every 30 minutes")
-print("\n✨ These will run RELIABLY unlike GitHub Actions!")
+print("\nThese will run reliably unlike GitHub Actions!")
 
 
