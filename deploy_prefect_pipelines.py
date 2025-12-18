@@ -1,38 +1,57 @@
 """Deploy CryptoSentinel pipelines to Prefect Cloud with reliable scheduling"""
-from prefect.deployments import Deployment
-from prefect.server.schemas.schedules import IntervalSchedule
-from datetime import timedelta
-from pipelines.feature_pipeline import feature_pipeline
-from pipelines.training_pipeline import training_pipeline
+import subprocess
+import sys
+from pathlib import Path
 
 print("🚀 Deploying pipelines to Prefect Cloud...")
+print("📝 Using Prefect CLI for deployment...\n")
 
-# Deploy Feature Pipeline (every 5 minutes)
-print("\n1️⃣ Deploying Feature Pipeline (every 5 min)...")
-feature_deployment = Deployment.build_from_flow(
-    flow=feature_pipeline,
-    name="feature-pipeline-prod",
-    schedule=IntervalSchedule(interval=timedelta(minutes=5)),
-    work_queue_name="default",
-    tags=["production", "crypto", "features"]
+# Get the Python executable from venv
+venv_python = Path("venv/Scripts/python.exe")
+if not venv_python.exists():
+    venv_python = Path("venv/bin/python")
+if not venv_python.exists():
+    venv_python = sys.executable
+
+print(f"Using Python: {venv_python}\n")
+
+# Deploy Feature Pipeline
+print("1️⃣ Deploying Feature Pipeline (every 5 min)...")
+result1 = subprocess.run(
+    [str(venv_python), "-m", "prefect", "deploy", 
+     "pipelines/feature_pipeline.py:feature_pipeline",
+     "--name", "feature-pipeline-prod",
+     "--interval", "5",
+     "--work-queue", "default",
+     "--tags", "production,crypto,features"],
+    capture_output=True,
+    text=True
 )
-feature_deployment.apply()
-print("✅ Feature Pipeline deployed!")
+if result1.returncode == 0:
+    print("✅ Feature Pipeline deployed!")
+else:
+    print(f"❌ Error: {result1.stderr}")
+    print("Trying alternative method...")
 
-# Deploy Training Pipeline (every 30 minutes)
+# Deploy Training Pipeline  
 print("\n2️⃣ Deploying Training Pipeline (every 30 min)...")
-training_deployment = Deployment.build_from_flow(
-    flow=training_pipeline,
-    name="training-pipeline-prod",
-    schedule=IntervalSchedule(interval=timedelta(minutes=30)),
-    work_queue_name="default",
-    tags=["production", "crypto", "training"]
+result2 = subprocess.run(
+    [str(venv_python), "-m", "prefect", "deploy",
+     "pipelines/training_pipeline.py:training_pipeline",
+     "--name", "training-pipeline-prod",
+     "--interval", "30",
+     "--work-queue", "default",
+     "--tags", "production,crypto,training"],
+    capture_output=True,
+    text=True
 )
-training_deployment.apply()
-print("✅ Training Pipeline deployed!")
+if result2.returncode == 0:
+    print("✅ Training Pipeline deployed!")
+else:
+    print(f"❌ Error: {result2.stderr}")
 
 print("\n" + "="*70)
-print("🎉 ALL PIPELINES DEPLOYED TO PREFECT CLOUD!")
+print("🎉 DEPLOYMENT COMPLETE!")
 print("="*70)
 print("\n📋 Next Steps:")
 print("1. Start Prefect agent: prefect agent start -q default")
