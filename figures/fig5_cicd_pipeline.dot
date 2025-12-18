@@ -1,0 +1,26 @@
+digraph CICDPipeline {
+    rankdir=LR;
+    node [shape=box, style=rounded, fontname="Arial", fontsize=9];
+    edge [fontname="Arial", fontsize=8];
+    
+    CodePush [label="Code Push\nto GitHub", fillcolor="#e3f2fd", style="rounded,filled"];
+    Trigger [label="GitHub Actions\nTriggered", fillcolor="#bbdefb", style="rounded,filled"];
+    TestJob [label="Test Job\n(Linting, Import Tests)", fillcolor="#90caf9", style="rounded,filled"];
+    FeatureJob [label="Feature Pipeline Job\n(Every 5 min via cron)", fillcolor="#a5d6a7", style="rounded,filled"];
+    TrainingJob [label="Training Pipeline Job\n(Every 30 min via cron)", fillcolor="#a5d6a7", style="rounded,filled"];
+    DeployJob [label="Deploy Job\n(On push to main)", fillcolor="#fff9c4", style="rounded,filled"];
+    UploadHF [label="Upload to\nHugging Face Spaces", fillcolor="#ffccbc", style="rounded,filled"];
+    Rebuild [label="Docker Image\nRebuild", fillcolor="#ffccbc", style="rounded,filled"];
+    StartServices [label="Services Start\nAutomatically", fillcolor="#c5e1a5", style="rounded,filled"];
+    
+    CodePush -> Trigger;
+    Trigger -> TestJob;
+    Trigger -> FeatureJob;
+    Trigger -> TrainingJob;
+    Trigger -> DeployJob;
+    DeployJob -> UploadHF;
+    UploadHF -> Rebuild;
+    Rebuild -> StartServices;
+}
+
+

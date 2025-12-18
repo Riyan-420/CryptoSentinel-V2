@@ -146,8 +146,18 @@ def render():
                     else:
                         status = "Incorrect"
                     
+                    try:
+                        ts_str = p.get('timestamp', '')
+                        if ts_str:
+                            ts = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
+                            time_display = ts.strftime('%Y-%m-%d %H:%M:%S')
+                        else:
+                            time_display = '-'
+                    except:
+                        time_display = p.get('timestamp', '')[:19] if p.get('timestamp') else '-'
+                    
                     display_data.append({
-                        "Time": p.get('timestamp', '')[:19],
+                        "Time": time_display,
                         "Current": f"${p.get('current_price', 0):,.2f}",
                         "Predicted": f"${p.get('predicted_price', 0):,.2f}",
                         "Direction": p.get('predicted_direction', '').upper(),

@@ -1,0 +1,36 @@
+digraph Containerization {
+    rankdir=TB;
+    node [shape=box, style=rounded, fontname="Arial", fontsize=9];
+    edge [fontname="Arial", fontsize=8];
+    
+    subgraph cluster_docker {
+        label="Docker Image (Dockerfile)";
+        style=bold;
+        color=blue;
+        
+        BaseImage [label="Base: python:3.11-slim\n(~150 MB)", fillcolor="#e3f2fd", style="rounded,filled"];
+        SysDeps [label="System Dependencies:\nbuild-essential, curl, git", fillcolor="#bbdefb", style="rounded,filled"];
+        PyDeps [label="Python Dependencies:\nscikit-learn, XGBoost\nSHAP, LIME, DeepChecks\nPrefect, FastAPI, Streamlit\nHopsworks", fillcolor="#90caf9", style="rounded,filled"];
+        AppCode [label="Application Code:\napp/ (config.py, predictor.py)\npages/ (home.py, predictions.py)\npipelines/ (feature_pipeline.py)\nstorage/ (feature_store.py)\ndashboard.py\nmodels/ (*.joblib)", fillcolor="#64b5f6", style="rounded,filled"];
+        
+        BaseImage -> SysDeps;
+        SysDeps -> PyDeps;
+        PyDeps -> AppCode;
+    }
+    
+    subgraph cluster_runtime {
+        label="Container Runtime";
+        style=dashed;
+        
+        Streamlit [label="Streamlit Dashboard\nCommand: streamlit run dashboard.py\n--server.port 7860\nBackground Scheduler:\nFeature & Training Pipelines", fillcolor="#fff9c4", style="rounded,filled"];
+    }
+    
+    User [label="User (Browser)", shape=ellipse, fillcolor="#fce4ec", style="rounded,filled"];
+    Port7860 [label="Port 7860", shape=ellipse, fillcolor="#e1bee7", style="rounded,filled"];
+    
+    AppCode -> Streamlit;
+    User -> Port7860;
+    Port7860 -> Streamlit;
+}
+
+

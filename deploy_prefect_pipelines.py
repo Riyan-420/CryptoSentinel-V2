@@ -21,14 +21,14 @@ training_deployment = training_pipeline.to_deployment(
 )
 
 # Apply deployments to Prefect Cloud
-print("1️⃣ Deploying Feature Pipeline (every 5 min)...")
+print("Deploying Feature Pipeline (every 5 min)...")
 try:
     feature_deployment.apply()
     print("Feature Pipeline deployed!")
 except Exception as e:
     print(f"Error deploying Feature Pipeline: {e}")
 
-print("\n2️⃣ Deploying Training Pipeline (every 30 min)...")
+print("\nDeploying Training Pipeline (every 30 min)...")
 try:
     training_deployment.apply()
     print("Training Pipeline deployed!")

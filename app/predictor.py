@@ -78,19 +78,15 @@ def ensure_models_loaded() -> bool:
     if model_loader.is_loaded:
         return True
     
-    # Try loading from local directory first
     if model_loader.load():
         return True
-    
-    # If local load failed, try loading from Hopsworks Model Registry
     logger.info("Local models not found, attempting to load from Hopsworks...")
     try:
         from storage.model_registry import get_latest_model
         
         hw_model_data = get_latest_model()
         if hw_model_data and hw_model_data.get("models"):
-            # Load models from Hopsworks data
-            model_loader.models = hw_model_data.get("models", {})
+        model_loader.models = hw_model_data.get("models", {})
             model_loader.scaler = hw_model_data.get("scaler")
             model_loader.metadata = hw_model_data.get("metadata", {})
             model_loader._loaded = bool(model_loader.models)
@@ -124,7 +120,6 @@ def generate_prediction(features: pd.DataFrame, current_price: float
         predictions = {}
         best_model = model_loader.best_model_name
         
-        # Get predictions from each regression model
         for name, model in model_loader.models.items():
             if name in ["classifier", "kmeans", "pca"]:
                 continue
@@ -137,19 +132,11 @@ def generate_prediction(features: pd.DataFrame, current_price: float
         if not predictions:
             return None
         
-        # Use best model prediction
         predicted_price = predictions.get(best_model, list(predictions.values())[0])
         
-        # Direction based on price comparison (PRIMARY METHOD - always correct)
-        # If predicted_price > current_price, price goes UP
-        # If predicted_price < current_price, price goes DOWN
         direction = "up" if predicted_price > current_price else "down"
-        
-        # Calculate confidence based on price difference
         price_diff_pct = abs(predicted_price - current_price) / current_price * 100
         confidence = min(95, 50 + price_diff_pct * 10)
-        
-        # Optional: Use classifier as secondary validation (but don't override price-based direction)
         if "classifier" in model_loader.models:
             try:
                 classifier_pred = model_loader.models["classifier"].predict(X_scaled)[0]
@@ -157,7 +144,6 @@ def generate_prediction(features: pd.DataFrame, current_price: float
                 direction_proba = model_loader.models["classifier"].predict_proba(X_scaled)
                 classifier_confidence = float(max(direction_proba[0])) * 100
                 
-                # Log if classifier disagrees with price-based direction (for debugging)
                 if classifier_direction != direction:
                     logger.warning(
                         f"Classifier disagrees with price prediction: "
@@ -165,13 +151,11 @@ def generate_prediction(features: pd.DataFrame, current_price: float
                         f"classifier says {classifier_direction} ({classifier_confidence:.1f}% confidence)"
                     )
                 
-                # Use classifier confidence if it's higher and agrees with price direction
                 if classifier_direction == direction and classifier_confidence > confidence:
                     confidence = classifier_confidence
             except Exception as e:
                 logger.warning(f"Classifier prediction failed: {e}, using price-based direction")
         
-        # Market regime from K-Means if available
         regime = "neutral"
         if "kmeans" in model_loader.models and "pca" in model_loader.models:
             X_pca = model_loader.models["pca"].transform(X_scaled)
@@ -242,10 +226,8 @@ def validate_predictions(current_price: float = None):
         if entry["was_correct"] is not None:
             continue
         
-        # Get target time for this prediction
         target_timestamp_ms = entry.get("target_timestamp_ms")
         if not target_timestamp_ms:
-            # Fallback for old predictions without target_timestamp
             try:
                 pred_time = datetime.fromisoformat(entry["timestamp"].replace('Z', '+00:00'))
             except (ValueError, AttributeError):
@@ -257,7 +239,6 @@ def validate_predictions(current_price: float = None):
             target_time = pred_time + timedelta(minutes=settings.PREDICTION_MINUTES)
             target_timestamp_ms = int(target_time.timestamp() * 1000)
         
-        # Check if we have price data for the target time (within 5 minute window)
         actual_price = None
         for hist_ts, hist_price in price_dict.items():
             time_diff_ms = abs(hist_ts - target_timestamp_ms)
@@ -265,7 +246,6 @@ def validate_predictions(current_price: float = None):
                 actual_price = hist_price
                 break
         
-        # If no history match, use current price as fallback (if target time has passed)
         if actual_price is None:
             target_time = datetime.fromtimestamp(target_timestamp_ms / 1000)
             if now >= target_time:
@@ -274,23 +254,19 @@ def validate_predictions(current_price: float = None):
                 else:
                     continue
             else:
-                continue  # Target time hasn't arrived yet
+                continue
         
-        # Validate the prediction
         entry["actual_price"] = round(actual_price, 2)
         entry["validated_at"] = now.isoformat()
         
         price_at_prediction = entry["current_price"]
         predicted_direction = entry["predicted_direction"]
         predicted_price = entry["predicted_price"]
-        
-        # Calculate actual change from prediction time to target time
         actual_change = actual_price - price_at_prediction
         actual_change_pct = abs(actual_change / price_at_prediction * 100)
         
         entry["error_amount"] = round(abs(predicted_price - actual_price), 2)
         
-        # TOLERANCE-BASED VALIDATION
         if actual_change_pct < tolerance_pct:
             entry["was_correct"] = False
             entry["validation_note"] = "price_within_tolerance"

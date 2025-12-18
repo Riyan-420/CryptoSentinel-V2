@@ -236,7 +236,7 @@ def render():
             """)
         
         with col2:
-            if st.button("🔍 Check Drift Only", type="secondary"):
+            if st.button("Check Drift Only", type="secondary"):
                 with st.spinner("Checking for drift..."):
                     try:
                         from app.data_fetcher import fetch_price_history

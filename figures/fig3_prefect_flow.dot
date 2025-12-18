@@ -1,0 +1,50 @@
+digraph PrefectFlow {
+    rankdir=TB;
+    node [shape=box, style=rounded, fontname="Arial", fontsize=9];
+    edge [fontname="Arial", fontsize=8];
+    
+    subgraph cluster_feature {
+        label="(a) Feature Pipeline (feature_pipeline.py)";
+        style=filled;
+        fillcolor="#e3f2fd";
+        
+        Flow1 [label="@flow feature_pipeline()", shape=ellipse, fillcolor="#bbdefb", style="rounded,filled"];
+        Task1 [label="@task fetch_price_data()\nFetches 24h data from CoinGecko\nRetries: 3x, 30s delay", fillcolor="#90caf9", style="rounded,filled"];
+        Task2 [label="@task engineer_features_task()\nComputes 40+ technical indicators\nRSI, MACD, Bollinger Bands", fillcolor="#90caf9", style="rounded,filled"];
+        Task3 [label="@task store_features_task()\nUploads to Hopsworks\ncrypto_features, version 1\nAutomatic deduplication", fillcolor="#90caf9", style="rounded,filled"];
+        
+        Flow1 -> Task1;
+        Task1 -> Task2;
+        Task2 -> Task3;
+    }
+    
+    subgraph cluster_training {
+        label="(b) Training Pipeline (training_pipeline.py)";
+        style=filled;
+        fillcolor="#e8f5e9";
+        
+        Flow2 [label="@flow training_pipeline()", shape=ellipse, fillcolor="#c8e6c9", style="rounded,filled"];
+        LoadTask [label="@task load_features()\nLoads from Hopsworks\nFeature Store", fillcolor="#a5d6a7", style="rounded,filled"];
+        DriftTask [label="@task check_drift_task()\nDeepChecks drift\ndetection", fillcolor="#a5d6a7", style="rounded,filled"];
+        TrainTask [label="@task train_models_task()\nTrains all models\n(XGBoost, RF, GB, Ridge)", fillcolor="#a5d6a7", style="rounded,filled"];
+        SelectTask [label="@task select_best_model_task()\nSelects based on\nvalidation RMSE", fillcolor="#a5d6a7", style="rounded,filled"];
+        SaveTask [label="@task save_models_task()\nSaves models (.joblib)\nPromotes best to active", fillcolor="#a5d6a7", style="rounded,filled"];
+        RegisterTask [label="@task register_models_task()\nUploads to Hopsworks\nModel Registry", fillcolor="#a5d6a7", style="rounded,filled"];
+        
+        Flow2 -> LoadTask;
+        LoadTask -> DriftTask;
+        DriftTask -> TrainTask;
+        TrainTask -> SelectTask;
+        SelectTask -> SaveTask;
+        SaveTask -> RegisterTask;
+    }
+    
+    HopsworksFS [label="Hopsworks\nFeature Store", shape=cylinder, fillcolor="#fff3e0", style="rounded,filled"];
+    HopsworksMR [label="Hopsworks\nModel Registry", shape=cylinder, fillcolor="#fff3e0", style="rounded,filled"];
+    
+    Task3 -> HopsworksFS;
+    HopsworksFS -> LoadTask;
+    RegisterTask -> HopsworksMR;
+}
+
+

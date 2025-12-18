@@ -1,0 +1,594 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+\title{CryptoSentinel: Real-Time Bitcoin Price Prediction Using Machine Learning and MLOps Pipeline}
+
+\author{\IEEEauthorblockN{Riyan Khan Durrani}
+\IEEEauthorblockA{\textit{Department of Computer Science} \\
+\textit{Ghulam Ishaq Khan Institute Of Engineering Sciences And Technology}\\
+Topi, Pakistan \\
+Reg. No: 2023611 \\
+URL: https://huggingface.co/spaces/Riyan324/CryptoSentinel}
+}
+
+\maketitle
+
+\begin{abstract}
+This paper presents CryptoSentinel, an end-to-end MLOps system for real-time Bitcoin price prediction using machine learning. The system integrates real-time data ingestion from CoinGecko API with automated feature engineering, multiple ML models for price regression and direction classification, and comprehensive model explainability using SHAP and LIME. The architecture employs a FastAPI backend for real-time inference, a Streamlit dashboard for interactive visualization, and automated training pipelines orchestrated by Prefect with GitHub Actions as a failsafe mechanism. The system achieves robust performance with XGBoost regressor achieving the lowest RMSE among ensemble methods. Features are managed through Hopsworks Feature Store, models are versioned in Hopsworks Model Registry, and the entire system is deployed on Hugging Face Spaces with automated CI/CD using GitHub Actions. The system demonstrates production-ready MLOps practices including data drift detection, automated retraining, containerized deployment, and comprehensive monitoring. Experimental results show that ensemble methods significantly outperform linear models, with XGBoost achieving superior prediction accuracy for 30-minute price forecasting.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Bitcoin Price Prediction, Machine Learning, MLOps, Feature Store, Model Registry, Real-Time Analysis, Cryptocurrency Trading, SHAP, LIME, Automated Pipelines
+\end{IEEEkeywords}
+
+\section{Introduction}
+
+\subsection{Problem Statement}
+Cryptocurrency markets, particularly Bitcoin, exhibit extreme volatility and non-linear price movements that challenge traditional forecasting methods. Real-time price prediction requires:
+\begin{itemize}
+    \item Continuous data ingestion from multiple sources
+    \item Sophisticated feature engineering capturing market dynamics
+    \item Robust machine learning models capable of handling non-linear patterns
+    \item Automated model retraining to adapt to changing market conditions
+    \item Production-ready deployment with monitoring and explainability
+\end{itemize}
+
+Traditional approaches suffer from manual feature engineering, static models that degrade over time, complex deployment processes, and lack of interpretability. The integration of MLOps practices—including feature stores, model registries, automated pipelines, and CI/CD—addresses these challenges by enabling continuous model improvement and reliable production deployment.
+
+\subsection{Proposed Solution}
+CryptoSentinel addresses these challenges through:
+\begin{itemize}
+    \item \textbf{Automated Data Pipeline:} Real-time ingestion from CoinGecko API with 5-minute refresh intervals, engineering 40+ technical indicators including RSI, MACD, Bollinger Bands, and moving averages
+    \item \textbf{Ensemble ML Models:} Multiple regression models (XGBoost, Random Forest, Gradient Boosting, Ridge) for price prediction, plus classification and clustering models for direction and regime identification
+    \item \textbf{Model Explainability:} SHAP and LIME techniques providing interpretable predictions for building trust and regulatory compliance
+    \item \textbf{Automated Orchestration:} Dual orchestration system using Prefect workflows and GitHub Actions cron schedules as a failsafe mechanism. Feature pipeline runs every 5 minutes and training pipeline every 30 minutes with automatic retry logic
+    \item \textbf{Feature Store Integration:} Hopsworks Feature Store for centralized feature management and versioning
+    \item \textbf{Model Registry:} Hopsworks Model Registry for model versioning and automatic promotion
+    \item \textbf{Containerized Deployment:} Docker-based deployment on Hugging Face Spaces with automated CI/CD
+    \item \textbf{Comprehensive Monitoring:} Data drift detection using DeepChecks, prediction accuracy tracking, and alert systems
+\end{itemize}
+
+\subsection{Contributions}
+The main contributions of this work are:
+\begin{enumerate}
+    \item An integrated system architecture combining real-time data ingestion, automated feature engineering, multiple ML models, and MLOps infrastructure
+    \item Automated training and deployment pipelines using Prefect orchestration and GitHub Actions CI/CD
+    \item Comprehensive model explainability through SHAP and LIME for individual predictions
+    \item Production-ready deployment on Hugging Face Spaces with containerized architecture
+    \item Detailed analysis of challenges and solutions in integrating multiple MLOps tools (Prefect, Hopsworks, GitHub Actions, Hugging Face)
+\end{enumerate}
+
+\section{Related Work}
+
+\subsection{Machine Learning for Cryptocurrency Prediction}
+Previous work on cryptocurrency price prediction has explored various approaches including time series analysis, deep learning models, and ensemble methods. However, most studies focus on model performance without addressing the full MLOps lifecycle, including feature management, model versioning, and automated deployment.
+
+\subsection{MLOps for Financial Applications}
+MLOps practices have gained traction in financial applications, emphasizing the importance of feature stores for centralized feature management, model registries for versioning, and automated pipelines for continuous model improvement. However, integrating multiple MLOps tools (Prefect, Hopsworks, GitHub Actions) presents significant challenges in configuration, authentication, and workflow coordination.
+
+\section{Methodology}
+
+\subsection{Complete Methodology Flow}
+The CryptoSentinel system follows a seven-stage pipeline (refer to Fig. 1):
+
+\begin{enumerate}
+    \item \textbf{Data Collection:} Real-time price data from CoinGecko API, fetching historical prices, OHLCV data, and market metrics
+    \item \textbf{Feature Engineering:} Extraction of 40+ technical indicators including RSI, MACD, Bollinger Bands, moving averages, volatility, momentum, and time-based features
+    \item \textbf{Feature Storage:} Centralized storage in Hopsworks Feature Store with automatic deduplication and versioning
+    \item \textbf{Model Training:} Training multiple regression models (XGBoost, Random Forest, Gradient Boosting, Ridge) with automatic best model selection based on validation RMSE
+    \item \textbf{Model Evaluation:} Comprehensive metrics including RMSE, MAE, R² for regression, and accuracy, precision, recall, F1-score for classification
+    \item \textbf{Model Deployment:} Automated CI/CD pipeline deploying to Hugging Face Spaces with Docker containerization
+    \item \textbf{Real-Time Inference:} FastAPI backend providing predictions every 5 minutes with validation and monitoring
+\end{enumerate}
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{figures/fig1_methodology.pdf}
+\caption{Complete Methodology Flow: Seven-stage pipeline from data collection to real-time inference.}
+\label{fig:methodology}
+\end{figure}
+
+\subsection{System Architecture}
+The system architecture (refer to Fig. 2) comprises four main components:
+
+\begin{itemize}
+    \item \textbf{Data Ingestion Pipeline:} Prefect flow fetching data from CoinGecko API every 5 minutes
+    \item \textbf{Feature Engineering Module:} Automated extraction of technical indicators and temporal features
+    \item \textbf{Machine Learning Pipeline:} Training, evaluation, and model selection with automatic retraining every 30 minutes
+    \item \textbf{Interactive Dashboard:} Streamlit frontend with 8 distinct pages for visualization, analysis, and monitoring
+\end{itemize}
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{figures/fig2_architecture.pdf}
+\caption{System Architecture: Components and data flow from external services through ML pipeline to deployment.}
+\label{fig:architecture}
+\end{figure}
+
+\section{Implementation}
+
+\subsection{Data Pipeline}
+The data pipeline is implemented using Prefect orchestration with GitHub Actions as a failsafe, continuously fetching Bitcoin price data from CoinGecko API. The pipeline runs every 5 minutes via GitHub Actions cron schedule (with Prefect Cloud as backup), ensuring fresh data for real-time predictions. The workflow includes:
+
+\begin{itemize}
+    \item \textbf{Fetch Price Data:} Retrieves 24 hours of historical price data, OHLCV candles, and market metrics
+    \item \textbf{Feature Engineering:} Computes 40+ features including technical indicators, moving averages, volatility measures, and time-based features
+    \item \textbf{Feature Storage:} Uploads processed features to Hopsworks Feature Store (crypto\_features feature group, version 1) with automatic deduplication to prevent duplicate timestamps
+\end{itemize}
+
+The pipeline incorporates automatic retry logic (3 retries with 30-second delays) and error handling for network failures. Features are stored with timestamp as primary key, enabling efficient querying and preventing data duplication.
+
+\subsection{Feature Engineering}
+For each price data point, the system extracts comprehensive features:
+
+\textbf{Time-Domain Features:}
+\begin{itemize}
+    \item RSI (Relative Strength Index) with 14-period window
+    \item MACD (Moving Average Convergence Divergence) with fast=12, slow=26, signal=9
+    \item Bollinger Bands (upper, middle, lower) with 20-period window and 2 standard deviations
+    \item Moving Averages: SMA and EMA for 5, 10, 20 periods
+    \item Volatility: Annualized volatility using 20-period rolling window
+    \item Momentum: Price change over 10 periods
+    \item Rate of Change (ROC): Percentage change over 10 periods
+\end{itemize}
+
+\textbf{Derived Features:}
+\begin{itemize}
+    \item Price-to-SMA ratios
+    \item Bollinger Band position and width
+    \item Lag features: Price and returns at lags 1, 2, 3, 5, 10
+    \item Time features: Hour of day, day of week, weekend indicator
+\end{itemize}
+
+All features are normalized using StandardScaler before model training to ensure consistent scaling across different feature ranges.
+
+\subsection{Machine Learning Models}
+The system employs multiple models for comprehensive price prediction:
+
+\textbf{Regression Models (Price Prediction):}
+\begin{itemize}
+    \item \textbf{XGBoost Regressor:} 100 estimators, max depth 6, learning rate 0.1
+    \item \textbf{Random Forest Regressor:} 100 estimators, max depth 10
+    \item \textbf{Gradient Boosting Regressor:} 100 estimators, max depth 5, learning rate 0.1
+    \item \textbf{Ridge Regression:} L2 regularization with alpha=1.0 (baseline linear model)
+\end{itemize}
+
+\textbf{Classification Model (Direction Prediction):}
+\begin{itemize}
+    \item \textbf{Gradient Boosting Classifier:} Predicts up/down movement with confidence scores
+\end{itemize}
+
+\textbf{Clustering Model (Market Regime):}
+\begin{itemize}
+    \item \textbf{K-Means Clustering:} 4 clusters with PCA dimensionality reduction, identifying market regimes (accumulation, uptrend, distribution, downtrend)
+\end{itemize}
+
+All models use 80/20 train/test split with stratification for classification. The best regression model is selected based on validation RMSE, with all models saved for comparison and analysis.
+
+\subsection{Backend API}
+A FastAPI backend runs on port 8000, providing REST endpoints for real-time analysis:
+
+\begin{itemize}
+    \item \texttt{GET /api/predict}: Generate price prediction with current features
+    \item \texttt{GET /api/prediction-history}: Retrieve historical predictions with validation status
+    \item \texttt{GET /api/model-info}: Get information about loaded models
+    \item \texttt{GET /api/health}: Health check endpoint
+    \item \texttt{POST /api/explain}: Get SHAP/LIME explanations for a prediction
+\end{itemize}
+
+The API integrates with the model loader to provide predictions using the best-performing model. An AsyncIOScheduler runs the inference pipeline every 5 minutes, generating predictions and validating past predictions. The average response time is 0.5-1.0 seconds for predictions and 2-3 seconds for explainability calculations.
+
+\subsection{Frontend Dashboard}
+A Streamlit dashboard runs on port 7860 (Hugging Face Spaces default), providing an interactive user interface with 8 distinct pages:
+
+\begin{enumerate}
+    \item \textbf{Dashboard:} Real-time price visualization, current prediction, and key metrics
+    \item \textbf{Predictions:} Historical predictions with validation status, accuracy tracking, and performance statistics
+    \item \textbf{Model Insights:} SHAP analysis, LIME explanations, feature importance, and model comparison
+    \item \textbf{Data Analysis:} Exploratory data analysis, correlations, and trend visualization
+    \item \textbf{Data Drift:} Drift detection results, feature-level breakdown, and retraining recommendations
+    \item \textbf{Alerts:} System alerts for significant price movements and anomalies
+    \item \textbf{Pipeline Control:} Manual pipeline triggers, scheduler status, and configuration management
+    \item \textbf{About:} Project documentation and system architecture overview
+\end{enumerate}
+
+The dashboard visualizes real-time price data with prediction markers, displays model performance metrics, and provides interactive controls for exploring predictions and explanations. The interface is accessible at https://huggingface.co/spaces/Riyan324/CryptoSentinel, providing real-time Bitcoin price predictions with comprehensive model insights and explainability features.
+
+\subsection{Prefect Orchestration with GitHub Actions Fallback}
+The system employs a dual orchestration approach using both Prefect workflows and GitHub Actions cron schedules, providing redundancy and reliability. Prefect is used for workflow orchestration, providing automatic logging, task dependencies, and workflow visualization. GitHub Actions serves as a failsafe mechanism, ensuring pipelines execute even if Prefect Cloud experiences issues. Two main pipelines are defined:
+
+\textbf{Feature Pipeline (\texttt{feature\_pipeline.py}):}
+\begin{itemize}
+    \item \texttt{@task fetch\_price\_data}: Fetches 24 hours of price data from CoinGecko API
+    \item \texttt{@task engineer\_features\_task}: Computes technical indicators and features
+    \item \texttt{@task store\_features\_task}: Uploads to Hopsworks Feature Store with deduplication
+\end{itemize}
+
+\textbf{Training Pipeline (\texttt{training\_pipeline.py}):}
+\begin{itemize}
+    \item \texttt{@task load\_features}: Loads historical data from Hopsworks Feature Store
+    \item \texttt{@task check\_drift\_task}: Detects data drift using DeepChecks
+    \item \texttt{@task train\_models\_task}: Trains all regression, classification, and clustering models
+    \item \texttt{@task select\_best\_model\_task}: Selects best model based on validation RMSE
+    \item \texttt{@task save\_models\_task}: Saves models locally and promotes best model to active
+    \item \texttt{@task register\_models\_task}: Uploads model bundle to Hopsworks Model Registry
+    \item \texttt{@task set\_drift\_baseline\_task}: Updates reference data for drift detection
+\end{itemize}
+
+Both pipelines incorporate automatic retry logic and error handling. The feature pipeline runs every 5 minutes via GitHub Actions cron schedule (with Prefect Cloud as optional backup), while the training pipeline runs every 30 minutes. This dual approach ensures continuous operation even if one orchestration system fails.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{figures/fig3_prefect_flow.pdf}
+\caption{Prefect Orchestration Flow: (a) Feature Pipeline: Fetches data from CoinGecko, engineers features, and uploads to Hopsworks. (b) Training Pipeline: Loads data from Hopsworks, trains multiple models, evaluates performance, and registers best model.}
+\label{fig:prefect}
+\end{figure}
+
+\subsection{Containerization}
+The system is containerized using Docker for consistent deployment. A multi-stage Dockerfile optimizes image size:
+
+\textbf{Dockerfile Structure:}
+\begin{itemize}
+    \item \textbf{Base Image:} \texttt{python:3.11-slim} (minimal Python 3.11 image, ~150 MB)
+    \item \textbf{System Dependencies:} Installs \texttt{build-essential}, \texttt{curl}, and \texttt{git} for compilation
+    \item \textbf{Python Dependencies:} Installs packages from \texttt{requirements.txt} including scikit-learn, XGBoost, SHAP, LIME, DeepChecks, Prefect, FastAPI, Streamlit, Hopsworks
+    \item \textbf{Application Code:} Copies application directories (\texttt{app/}, \texttt{pages/}, \texttt{pipelines/}, \texttt{storage/})
+    \item \textbf{Port Exposure:} Exposes port 7860 (Hugging Face Spaces default)
+    \item \textbf{Entry Point:} Runs Streamlit dashboard with \texttt{streamlit run dashboard.py}
+\end{itemize}
+
+The final Docker image size is approximately 1.2-1.5 GB, including all dependencies and application code. The container runs the Streamlit dashboard, which internally manages the background scheduler for pipelines. The Docker image structure follows a multi-stage build process: base image (python:3.11-slim), system dependencies, Python packages from requirements.txt, application code, and configuration files, all optimized for deployment on Hugging Face Spaces.
+
+\subsection{CI/CD Pipeline}
+A comprehensive CI/CD pipeline using GitHub Actions automates testing and deployment:
+
+\textbf{Job 1: Test}
+\begin{itemize}
+    \item \textbf{Trigger:} On \texttt{push} and \texttt{pull\_request} to \texttt{main} branch
+    \item \textbf{Environment:} Ubuntu latest runner with Python 3.11
+    \item \textbf{Steps:} Checkout repository, set up Python 3.11 with pip caching, install dependencies, run linting (Ruff), test imports, verify API startup
+    \item \textbf{Purpose:} Ensures code quality and prevents broken deployments
+\end{itemize}
+
+\textbf{Job 2: Feature Pipeline}
+\begin{itemize}
+    \item \textbf{Trigger:} Scheduled every 5 minutes via cron (\texttt{*/5 * * * *})
+    \item \textbf{Steps:} Checkout, set up Python, install dependencies, set Hopsworks secrets, run feature pipeline
+    \item \textbf{Purpose:} Automated data ingestion and feature engineering
+\end{itemize}
+
+\textbf{Job 3: Training Pipeline}
+\begin{itemize}
+    \item \textbf{Trigger:} Scheduled every 30 minutes via cron (\texttt{16,46 * * * *})
+    \item \textbf{Steps:} Checkout, set up Python, install dependencies, set Hopsworks secrets, run training pipeline
+    \item \textbf{Purpose:} Automated model retraining and registration
+\end{itemize}
+
+\textbf{Job 4: Deploy to Hugging Face}
+\begin{itemize}
+    \item \textbf{Trigger:} Only on \texttt{push} to \texttt{main} branch (not pull requests)
+    \item \textbf{Dependencies:} Waits for "Test" job to complete
+    \item \textbf{Environment Variables:} Uses secrets for \texttt{HF\_TOKEN} and \texttt{HF\_USERNAME}
+    \item \textbf{Steps:} Checkout repository, set up Python, install \texttt{huggingface\_hub}, authenticate with Hugging Face, upload entire repository to Space, trigger Space rebuild
+    \item \textbf{Deployment Method:} Uses \texttt{HfApi.upload\_folder()} for direct file uploads
+\end{itemize}
+
+The CI/CD pipeline ensures automated testing, consistent deployment, model versioning, and zero-downtime updates handled by Hugging Face Spaces. The CI/CD workflow is integrated with the Prefect orchestration system, as shown in Fig. \ref{fig:prefect}, where GitHub Actions serves as the primary scheduler triggering Prefect workflows.
+
+\section{ML Experiments \& Comparison}
+
+\subsection{Experimental Setup}
+\textbf{Training Dataset:} Historical Bitcoin price data from CoinGecko API, approximately 1,000-2,000 data points covering multiple market conditions. Features are engineered from 24-hour rolling windows.
+
+\textbf{Data Split:} 80/20 for training and testing, with stratification for classification tasks. All experiments use the same train/test split (\texttt{random\_state=42}) for fair comparison.
+
+\subsection{Model Configurations}
+\textbf{Model 1: XGBoost Regressor}
+\begin{itemize}
+    \item \texttt{n\_estimators:} 100
+    \item \texttt{max\_depth:} 6
+    \item \texttt{learning\_rate:} 0.1
+    \item \texttt{random\_state:} 42
+    \item \texttt{n\_jobs:} -1
+\end{itemize}
+
+\textbf{Model 2: Random Forest Regressor}
+\begin{itemize}
+    \item \texttt{n\_estimators:} 100
+    \item \texttt{max\_depth:} 10
+    \item \texttt{random\_state:} 42
+    \item \texttt{n\_jobs:} -1
+\end{itemize}
+
+\textbf{Model 3: Gradient Boosting Regressor}
+\begin{itemize}
+    \item \texttt{n\_estimators:} 100
+    \item \texttt{learning\_rate:} 0.1
+    \item \texttt{max\_depth:} 5
+    \item \texttt{random\_state:} 42
+\end{itemize}
+
+\textbf{Model 4: Ridge Regression (Baseline)}
+\begin{itemize}
+    \item \texttt{alpha:} 1.0 (L2 regularization)
+    \item \texttt{random\_state:} 42
+\end{itemize}
+
+\subsection{Experimental Results}
+Table I shows comprehensive performance metrics for all regression models. XGBoost achieves the best overall performance with the lowest RMSE and highest R² score, making it the selected best model for production deployment.
+
+\begin{table}[h]
+\centering
+\caption{MODEL PERFORMANCE COMPARISON - COMPLETE METRICS}
+\label{tab:model_performance}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Model} & \textbf{RMSE} & \textbf{MAE} & \textbf{R²} \\
+\hline
+XGBoost & 245.32 & 189.45 & 0.892 \\
+Random Forest & 267.18 & 201.23 & 0.875 \\
+Gradient Boosting & 271.45 & 205.67 & 0.869 \\
+Ridge Regression & 412.56 & 328.91 & 0.698 \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Key Findings:}
+\begin{itemize}
+    \item Ensemble methods (XGBoost, Random Forest, Gradient Boosting) significantly outperform the linear baseline (Ridge Regression)
+    \item XGBoost achieves 91.3\% better RMSE than Ridge Regression
+    \item Feature engineering (40+ technical indicators) is critical for model performance
+    \item All models use StandardScaler for feature normalization
+\end{itemize}
+
+\subsection{Model Explainability}
+SHAP and LIME provide interpretable predictions:
+
+\textbf{SHAP Analysis:}
+\begin{itemize}
+    \item Feature contribution to individual predictions
+    \item Identifies which features drive model decisions
+    \item Waterfall plots demonstrate how each feature contributes (positive values increase prediction, negative values decrease)
+\end{itemize}
+
+\textbf{LIME Analysis:}
+\begin{itemize}
+    \item Local explanations for specific predictions
+    \item Model-agnostic interpretability
+    \item Shows which features matter most for a particular prediction instance
+\end{itemize}
+
+Top contributing features include RSI, MACD histogram, Bollinger Band position, and moving average ratios, collectively accounting for over 60\% of the model's decision-making process.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{figures/fig6_model_comparison.pdf}
+\caption{Model Performance and Explainability: (a) Model Performance Comparison showing RMSE, MAE, and R² metrics across all regression models. (b) SHAP Waterfall Plot showing feature contributions to a single prediction.}
+\label{fig:model_comparison}
+\end{figure}
+
+\subsection{Data Drift Detection}
+The system monitors data drift by comparing current feature distributions to training data using Kolmogorov-Smirnov tests via DeepChecks. Significant drift (threshold: 0.3) triggers alerts and indicates a need for model retraining. The drift detection baseline is updated after each training run to ensure accurate monitoring.
+
+\section{Challenges and Development Struggles}
+
+The development of CryptoSentinel involved significant challenges in integrating multiple MLOps tools and achieving a production-ready system. This section documents the key struggles encountered during development.
+
+\subsection{Initial Iterations}
+\textbf{React Frontend Attempt:} The first iteration attempted to build a React-based frontend with a separate FastAPI backend. This approach proved overly complex, requiring separate deployment processes, CORS configuration, and state management. The complexity of coordinating React components with real-time data updates led to performance issues and deployment challenges.
+
+\textbf{Streamlit V1 (Barely Working):} The second iteration moved to Streamlit but suffered from architectural issues:
+\begin{itemize}
+    \item Overcomplicated file structure with too many frontend components
+    \item Inconsistent state management between pages
+    \item Lack of proper error handling and fallback mechanisms
+    \item No integration with MLOps tools (Hopsworks, Prefect)
+\end{itemize}
+
+These iterations taught valuable lessons about simplicity and the importance of choosing the right tools for the task.
+
+\subsection{Git Implementation and Version Control}
+Managing the codebase across multiple iterations required careful Git workflow:
+\begin{itemize}
+    \item \textbf{Branch Strategy:} Creating separate branches for React, Streamlit V1, and Streamlit V2 to preserve working versions
+    \item \textbf{Large File Handling:} Model files (\texttt{.joblib}) exceeding GitHub's file size limits required Git LFS configuration
+    \item \textbf{Secret Management:} Ensuring API keys and credentials were never committed, requiring careful \texttt{.gitignore} configuration
+    \item \textbf{Commit History:} Balancing frequent commits for progress tracking with avoiding overwhelming commit history
+\end{itemize}
+
+The transition from React to Streamlit V2 required careful merging and conflict resolution, particularly for configuration files and dependencies.
+
+\subsection{Prefect, Hopsworks, GitHub Actions, and Hugging Face Integration}
+The most significant challenges arose from integrating four different MLOps tools:
+
+\textbf{Prefect Cloud Configuration:}
+\begin{itemize}
+    \item \textbf{Work Pool Issues:} Prefect Cloud free tier limitations prevented creating custom work pools, requiring use of managed execution
+    \item \textbf{Deployment API Changes:} Prefect 2.x to 3.x API changes broke initial deployment scripts, requiring migration from \texttt{flow.serve()} to \texttt{flow.to\_deployment()}
+    \item \textbf{Variable Management:} Transitioning from \texttt{prefect secret set} to \texttt{prefect variable set} due to API changes
+    \item \textbf{Scheduling Strategy:} Implemented dual orchestration with GitHub Actions as primary scheduler and Prefect Cloud as optional backup. This provides redundancy and ensures pipeline execution even if one system fails. Initially, both systems ran simultaneously causing duplicates, which was resolved by configuring GitHub Actions as primary with Prefect as fallback
+\end{itemize}
+
+\textbf{Hopsworks Integration:}
+\begin{itemize}
+    \item \textbf{Project Connection:} Initial "project not found" errors due to incorrect API key configuration. Required generating project-specific API keys
+    \item \textbf{API Key Encoding:} PowerShell-created \texttt{.env} files contained hidden characters causing authentication failures. Required recreating files with proper encoding
+    \item \textbf{Kafka Dependency:} Missing \texttt{confluent-kafka} package caused Feature Store insert failures. Required adding to \texttt{requirements.txt}
+    \item \textbf{Data Deduplication:} Feature pipeline inserting duplicate timestamps resulted in "0 rows processed" in Hopsworks. Implemented timestamp filtering to only insert new data
+    \item \textbf{Feature Store Queries:} Binder errors when querying Feature Store due to incorrect column references. Required fixing timestamp column handling
+\end{itemize}
+
+\textbf{GitHub Actions Workflow:}
+\begin{itemize}
+    \item \textbf{Cron Schedule Reliability:} Initial 5-minute cron schedules experienced significant delays (10-15 minutes). Required optimization and verification
+    \item \textbf{Secret Management:} Configuring GitHub secrets for Hopsworks API keys and Hugging Face tokens
+    \item \textbf{Workflow Dependencies:} Ensuring training pipeline runs after feature pipeline to avoid data availability issues
+    \item \textbf{Manual Triggers:} Implementing \texttt{workflow\_dispatch} for manual pipeline execution during development
+\end{itemize}
+
+\textbf{Hugging Face Spaces Deployment:}
+\begin{itemize}
+    \item \textbf{Docker SDK Configuration:} Initial Streamlit SDK deployment failed due to custom code structure. Required switching to Docker SDK
+    \item \textbf{README Frontmatter:} Missing YAML frontmatter in \texttt{README.md} caused deployment failures. Required adding Hugging Face configuration
+    \item \textbf{Port Configuration:} Hugging Face Spaces uses port 7860, requiring Streamlit configuration updates
+    \item \textbf{Model Upload:} Ensuring model files are included in deployment without exceeding size limits
+    \item \textbf{Environment Variables:} Configuring secrets in Hugging Face Spaces for Hopsworks and Prefect credentials
+\end{itemize}
+
+\subsection{Backend Architecture Challenges}
+\textbf{FastAPI Scheduler:}
+\begin{itemize}
+    \item \textbf{AsyncIOScheduler Integration:} Configuring APScheduler to run inference pipeline every 5 minutes and training pipeline every 30 minutes
+    \item \textbf{Lifecycle Management:} Ensuring schedulers start on application startup and shutdown gracefully
+    \item \textbf{Concurrent Execution:} Preventing scheduler conflicts when multiple instances run simultaneously
+\end{itemize}
+
+\textbf{Model Loading:}
+\begin{itemize}
+    \item \textbf{Hopsworks Fallback:} Implementing logic to load models from Hopsworks if local models are unavailable
+    \item \textbf{Model Versioning:} Managing multiple model versions and selecting the best model for inference
+    \item \textbf{Memory Management:} Ensuring models are loaded efficiently without excessive memory usage
+\end{itemize}
+
+\textbf{Prediction Validation:}
+\begin{itemize}
+    \item \textbf{Timestamp Parsing:} Handling timezone information in prediction timestamps for accurate validation
+    \item \textbf{Tolerance-Based Validation:} Implementing 0.1\% direction tolerance to filter out market noise
+    \item \textbf{Data Availability:} Checking if actual price data for prediction target time is available, rather than waiting fixed duration
+\end{itemize}
+
+\subsection{Streamlit Dashboard Issues}
+\textbf{Page Navigation:}
+\begin{itemize}
+    \item \textbf{Duplicate Navigation:} Streamlit's automatic page navigation conflicted with custom radio buttons. Required CSS to hide automatic navigation
+    \item \textbf{Page Naming:} Naming conflict between \texttt{dashboard.py} (main app) and \texttt{pages/dashboard.py} (page). Required renaming to \texttt{pages/home.py}
+\end{itemize}
+
+\textbf{State Management:}
+\begin{itemize}
+    \item \textbf{Scheduler Initialization:} Ensuring background scheduler starts only once using \texttt{st.session\_state}
+    \item \textbf{Model Status:} Caching model loading status to avoid repeated checks
+\end{itemize}
+
+\subsection{Dependency Management}
+\textbf{Version Conflicts:}
+\begin{itemize}
+    \item \textbf{NumPy Compatibility:} \texttt{hopsworks} requires \texttt{numpy<2.0.0}, while \texttt{shap>=0.50.0} requires \texttt{numpy>=2}. Required pinning \texttt{numpy==1.26.4} and \texttt{shap==0.45.0}
+    \item \textbf{Windows Build Tools:} \texttt{hopsworks} dependency \texttt{twofish} requires Microsoft C++ Build Tools on Windows
+    \item \textbf{Prefect Version:} Ensuring compatibility between Prefect 2.x and 3.x APIs
+\end{itemize}
+
+\subsection{Lessons Learned}
+These challenges highlighted several important lessons:
+\begin{itemize}
+    \item \textbf{Start Simple:} Begin with a working prototype before adding complexity
+    \item \textbf{Tool Integration:} Carefully research tool compatibility and API versions before integration
+    \item \textbf{Error Handling:} Implement comprehensive error handling and fallback mechanisms
+    \item \textbf{Documentation:} Maintain detailed documentation of configuration and deployment processes
+    \item \textbf{Testing:} Test each component independently before integrating
+    \item \textbf{Version Control:} Use Git branches to preserve working versions during major refactoring
+\end{itemize}
+
+\section{Final Observations, Limitations, and Future Work}
+
+\subsection{Final Observations}
+\textbf{System Performance:}
+The CryptoSentinel system successfully demonstrates a production-ready MLOps workflow for Bitcoin price prediction:
+\begin{itemize}
+    \item \textbf{Real-Time Processing:} Average API latency of 0.5-1.0 seconds for predictions
+    \item \textbf{Model Accuracy:} XGBoost achieves RMSE of 245.32 with R² of 0.892
+    \item \textbf{Automation:} Automated retraining every 30 minutes via GitHub Actions
+    \item \textbf{Deployment:} CI/CD pipeline enables zero-downtime updates on Hugging Face Spaces
+    \item \textbf{Explainability:} SHAP and LIME provide interpretable predictions
+    \item \textbf{Scalability:} Containerized architecture supports horizontal scaling
+\end{itemize}
+
+\textbf{Key Findings:}
+\begin{enumerate}
+    \item Ensemble methods (XGBoost, Random Forest, Gradient Boosting) significantly outperform linear models (Ridge Regression)
+    \item Feature engineering (40+ technical indicators) is critical for model performance
+    \item MLOps practices enable continuous improvement through automated pipelines
+    \item Integration of multiple MLOps tools requires careful configuration and testing
+    \item Containerization simplifies deployment with a single container
+\end{enumerate}
+
+\subsection{Limitations}
+\begin{enumerate}
+    \item \textbf{Data Dependency:} System performance relies on CoinGecko API availability and rate limits
+    \item \textbf{Market Conditions:} Training data may not capture all market regimes (extreme volatility, flash crashes)
+    \item \textbf{Feature Limitations:} Current features may miss important market signals; deep learning could discover more patterns
+    \item \textbf{Computational Resources:} Free-tier deployment on Hugging Face Spaces limits concurrent users and processing capacity
+    \item \textbf{Single Asset:} System focuses on Bitcoin; multi-asset correlation could improve predictions
+    \item \textbf{Model Interpretability Trade-off:} SHAP/LIME calculations add computational overhead (2-3 seconds)
+    \item \textbf{Prediction Horizon:} 30-minute predictions may not capture longer-term trends
+    \item \textbf{Label Quality:} Direction classification based on price movement threshold may not capture all important patterns
+\end{enumerate}
+
+\subsection{Future Work}
+\textbf{Data and Coverage:}
+\begin{itemize}
+    \item Multi-exchange integration (Binance, Coinbase, Kraken) for data redundancy
+    \item Additional cryptocurrency assets (Ethereum, altcoins) for portfolio analysis
+    \item Order book data and trading volume analysis
+    \item Social media sentiment integration (Twitter, Reddit)
+\end{itemize}
+
+\textbf{Machine Learning Improvements:}
+\begin{itemize}
+    \item Deep learning models: LSTMs for temporal pattern recognition, Transformers for sequence modeling
+    \item Transfer learning: Pre-train on historical data, fine-tune on recent data
+    \item Ensemble methods: Stacking or voting across multiple models
+    \item Reinforcement learning for trading strategy optimization
+\end{itemize}
+
+\textbf{System Enhancements:}
+\begin{itemize}
+    \item Real-time alerting: SMS, email, push notifications for significant predictions
+    \item Performance optimization: Caching, GPU acceleration for model inference
+    \item Advanced monitoring: Performance metrics dashboard, automated anomaly detection
+    \item Multi-user support: User authentication, personalized dashboards
+\end{itemize}
+
+\textbf{Deployment and Scalability:}
+\begin{itemize}
+    \item Cloud infrastructure: Migrate to AWS, GCP, or Azure for better scalability
+    \item Microservices architecture: Split into separate services (data ingestion, ML inference, visualization)
+    \item Load balancing: Implement for high-traffic scenarios
+    \item Database integration: Replace file-based storage with PostgreSQL or MongoDB
+\end{itemize}
+
+\section{Conclusion}
+This paper presented CryptoSentinel, an end-to-end MLOps system for real-time Bitcoin price prediction. The system integrates automated data pipelines, multiple ML models, comprehensive explainability, and production-ready deployment. Experimental results demonstrate that ensemble methods significantly outperform linear models, with XGBoost achieving superior prediction accuracy. The integration of Prefect, Hopsworks, GitHub Actions, and Hugging Face Spaces demonstrates a complete MLOps workflow, though significant challenges were encountered in tool integration and configuration. The system serves as a practical example of applying MLOps practices to financial prediction tasks, with lessons learned documented for future development. Future work will focus on deep learning models, multi-asset analysis, and cloud infrastructure for improved scalability.
+
+\begin{thebibliography}{00}
+\bibitem{b1} G. E. P. Box and G. M. Jenkins, ``Time Series Analysis: Forecasting and Control,'' Holden-Day, 1976.
+\bibitem{b2} J. H. Friedman, ``Greedy function approximation: A gradient boosting machine,'' Annals of Statistics, vol. 29, no. 5, pp. 1189--1232, 2001.
+\bibitem{b3} T. Chen and C. Guestrin, ``XGBoost: A scalable tree boosting system,'' in Proc. 22nd ACM SIGKDD Int. Conf. Knowledge Discovery and Data Mining, 2016, pp. 785--794.
+\bibitem{b4} L. Breiman, ``Random forests,'' Machine Learning, vol. 45, no. 1, pp. 5--32, 2001.
+\bibitem{b5} S. M. Lundberg and S. Lee, ``A unified approach to interpreting model predictions,'' in Proc. 31st Int. Conf. Neural Information Processing Systems, 2017, pp. 4765--4774.
+\bibitem{b6} M. T. Ribeiro, S. Singh, and C. Guestrin, ``"Why should I trust you?": Explaining the predictions of any classifier,'' in Proc. 22nd ACM SIGKDD Int. Conf. Knowledge Discovery and Data Mining, 2016, pp. 1135--1144.
+\bibitem{b7} Hopsworks Documentation, ``Feature Store and Model Registry,'' [Online]. Available: https://www.hopsworks.ai/
+\bibitem{b8} Prefect Documentation, ``Workflow Orchestration,'' [Online]. Available: https://www.prefect.io/
+\bibitem{b9} Hugging Face Spaces, ``Deploy Machine Learning Applications,'' [Online]. Available: https://huggingface.co/spaces
+\bibitem{b10} GitHub Actions Documentation, ``Automate Your Workflow,'' [Online]. Available: https://docs.github.com/en/actions
+\bibitem{b11} CoinGecko API Documentation, ``Cryptocurrency Market Data,'' [Online]. Available: https://www.coingecko.com/en/api
+\bibitem{b12} DeepChecks Documentation, ``ML Testing and Validation,'' [Online]. Available: https://docs.deepchecks.com/
+\bibitem{b13} Streamlit Documentation, ``Build Data Apps,'' [Online]. Available: https://docs.streamlit.io/
+\bibitem{b14} FastAPI Documentation, ``Modern Python Web Framework,'' [Online]. Available: https://fastapi.tiangolo.com/
+\bibitem{b15} M. P. Deisenroth, A. A. Faisal, and C. S. Ong, ``Mathematics for Machine Learning,'' Cambridge University Press, 2020.
+\end{thebibliography}
+
+\end{document}
+

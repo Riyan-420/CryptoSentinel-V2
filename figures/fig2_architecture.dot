@@ -1,0 +1,67 @@
+digraph SystemArchitecture {
+    rankdir=TB;
+    node [shape=box, style=rounded, fontname="Arial", fontsize=9];
+    edge [fontname="Arial", fontsize=8];
+    
+    subgraph cluster_external {
+        label="External Services";
+        style=dashed;
+        CoinGecko [label="CoinGecko API", fillcolor="#fff3e0", style="rounded,filled"];
+        HopsworksFS [label="Hopsworks\nFeature Store", fillcolor="#fff3e0", style="rounded,filled"];
+        HopsworksMR [label="Hopsworks\nModel Registry", fillcolor="#fff3e0", style="rounded,filled"];
+    }
+    
+    subgraph cluster_pipeline {
+        label="Data Pipeline";
+        style=dashed;
+        DataFetcher [label="Data Fetcher", fillcolor="#e8f5e9", style="rounded,filled"];
+        FeatureEng [label="Feature Engineering", fillcolor="#e8f5e9", style="rounded,filled"];
+    }
+    
+    subgraph cluster_api {
+        label="ML API (Port 8000)";
+        style=dashed;
+        FastAPI [label="FastAPI Backend\n(Predictions, Validation)", fillcolor="#f3e5f5", style="rounded,filled"];
+    }
+    
+    subgraph cluster_ml {
+        label="Machine Learning Layer";
+        style=dashed;
+        Models [label="XGBoost, RF, GB, Ridge\nClassifier, K-Means", fillcolor="#e1f5fe", style="rounded,filled"];
+        Explainability [label="SHAP/LIME", fillcolor="#e1f5fe", style="rounded,filled"];
+    }
+    
+    subgraph cluster_frontend {
+        label="Frontend (Port 7860)";
+        style=dashed;
+        Streamlit [label="Streamlit Dashboard\n(8 Pages)", fillcolor="#fff9c4", style="rounded,filled"];
+    }
+    
+    subgraph cluster_orchestration {
+        label="Orchestration";
+        style=dashed;
+        Prefect [label="Prefect Pipelines", fillcolor="#fce4ec", style="rounded,filled"];
+        GitHubActions [label="GitHub Actions", fillcolor="#fce4ec", style="rounded,filled"];
+    }
+    
+    subgraph cluster_container {
+        label="Docker Container\n(Hugging Face Spaces)";
+        style=bold;
+        color=blue;
+        
+        CoinGecko -> DataFetcher;
+        DataFetcher -> FeatureEng;
+        FeatureEng -> HopsworksFS;
+        HopsworksFS -> Models;
+        Models -> FastAPI;
+        Models -> Explainability;
+        Explainability -> FastAPI;
+        FastAPI -> Streamlit;
+        Prefect -> DataFetcher;
+        Prefect -> Models;
+        GitHubActions -> Prefect;
+        Models -> HopsworksMR;
+    }
+}
+
+

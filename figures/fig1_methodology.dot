@@ -1,0 +1,22 @@
+digraph MethodologyFlow {
+    rankdir=LR;
+    node [shape=box, style=rounded, fontname="Arial", fontsize=10];
+    edge [fontname="Arial", fontsize=9];
+    
+    DataCollection [label="1. Data Collection\n(CoinGecko API)", fillcolor="#e3f2fd", style="rounded,filled"];
+    FeatureEng [label="2. Feature Engineering\n(40+ Technical Indicators)", fillcolor="#e3f2fd", style="rounded,filled"];
+    FeatureStore [label="3. Feature Storage\n(Hopsworks Feature Store)", fillcolor="#e3f2fd", style="rounded,filled"];
+    ModelTrain [label="4. Model Training\n(XGBoost, RF, GB, Ridge)", fillcolor="#e3f2fd", style="rounded,filled"];
+    ModelEval [label="5. Model Evaluation\n(RMSE, MAE, R²)", fillcolor="#e3f2fd", style="rounded,filled"];
+    ModelDeploy [label="6. Model Deployment\n(CI/CD to Hugging Face)", fillcolor="#e3f2fd", style="rounded,filled"];
+    Inference [label="7. Real-Time Inference\n(FastAPI + Streamlit)", fillcolor="#e3f2fd", style="rounded,filled"];
+    
+    DataCollection -> FeatureEng;
+    FeatureEng -> FeatureStore;
+    FeatureStore -> ModelTrain;
+    ModelTrain -> ModelEval;
+    ModelEval -> ModelDeploy;
+    ModelDeploy -> Inference;
+}
+
+
