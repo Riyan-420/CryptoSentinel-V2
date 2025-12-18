@@ -74,10 +74,35 @@ model_loader = ModelLoader()
 
 
 def ensure_models_loaded() -> bool:
-    """Ensure models are loaded"""
-    if not model_loader.is_loaded:
-        return model_loader.load()
-    return True
+    """Ensure models are loaded - try local first, then Hopsworks"""
+    if model_loader.is_loaded:
+        return True
+    
+    # Try loading from local directory first
+    if model_loader.load():
+        return True
+    
+    # If local load failed, try loading from Hopsworks Model Registry
+    logger.info("Local models not found, attempting to load from Hopsworks...")
+    try:
+        from storage.model_registry import get_latest_model
+        
+        hw_model_data = get_latest_model()
+        if hw_model_data and hw_model_data.get("models"):
+            # Load models from Hopsworks data
+            model_loader.models = hw_model_data.get("models", {})
+            model_loader.scaler = hw_model_data.get("scaler")
+            model_loader.metadata = hw_model_data.get("metadata", {})
+            model_loader._loaded = bool(model_loader.models)
+            
+            if model_loader._loaded:
+                logger.info(f"✅ Loaded {len(model_loader.models)} models from Hopsworks Model Registry")
+                return True
+    except Exception as e:
+        logger.warning(f"Failed to load from Hopsworks: {e}")
+    
+    logger.error("❌ Could not load models from local or Hopsworks")
+    return False
 
 
 def generate_prediction(features: pd.DataFrame, current_price: float
