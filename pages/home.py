@@ -94,16 +94,81 @@ def render():
         df = pd.DataFrame(history)
         df['datetime'] = pd.to_datetime(df['timestamp'], unit='ms')
         
+        # Calculate price range for better visualization
+        price_min = df['price'].min()
+        price_max = df['price'].max()
+        price_range = price_max - price_min
+        price_center = (price_min + price_max) / 2
+        
+        # Use tighter y-axis range to show volatility (center around price range with padding)
+        y_padding = max(price_range * 0.15, 500)  # At least $500 padding or 15% of range
+        y_min = price_min - y_padding
+        y_max = price_max + y_padding
+        
         fig = go.Figure()
         
+        # Add green/red fill based on price movement
+        df['price_change'] = df['price'].diff()
+        df['color'] = df['price_change'].apply(lambda x: '#22c55e' if x >= 0 else '#ef4444')
+        
+        # Main price line with gradient colors
+        for i in range(len(df) - 1):
+            fig.add_trace(go.Scatter(
+                x=df['datetime'].iloc[i:i+2],
+                y=df['price'].iloc[i:i+2],
+                mode='lines',
+                name='BTC Price' if i == 0 else '',
+                showlegend=(i == 0),
+                line=dict(
+                    color=df['color'].iloc[i+1],
+                    width=3
+                ),
+                hoverinfo='skip'
+            ))
+        
+        # Add filled area under the curve
         fig.add_trace(go.Scatter(
             x=df['datetime'],
             y=df['price'],
             mode='lines',
-            name='BTC Price',
-            line=dict(color='#a855f7', width=2),
+            name='Price Area',
             fill='tozeroy',
-            fillcolor='rgba(168, 85, 247, 0.1)'
+            fillcolor='rgba(168, 85, 247, 0.15)',
+            line=dict(width=0),
+            showlegend=False,
+            hoverinfo='skip'
+        ))
+        
+        # Add high/low markers
+        max_idx = df['price'].idxmax()
+        min_idx = df['price'].idxmin()
+        
+        fig.add_trace(go.Scatter(
+            x=[df['datetime'].iloc[max_idx]],
+            y=[df['price'].iloc[max_idx]],
+            mode='markers',
+            name='24h High',
+            marker=dict(
+                symbol='triangle-down',
+                size=12,
+                color='#22c55e',
+                line=dict(width=2, color='white')
+            ),
+            hovertemplate='<b>24h High</b><br>$%{y:,.2f}<extra></extra>'
+        ))
+        
+        fig.add_trace(go.Scatter(
+            x=[df['datetime'].iloc[min_idx]],
+            y=[df['price'].iloc[min_idx]],
+            mode='markers',
+            name='24h Low',
+            marker=dict(
+                symbol='triangle-up',
+                size=12,
+                color='#ef4444',
+                line=dict(width=2, color='white')
+            ),
+            hovertemplate='<b>24h Low</b><br>$%{y:,.2f}<extra></extra>'
         ))
         
         # Add prediction line if available
@@ -112,45 +177,85 @@ def render():
                 last_time = df['datetime'].iloc[-1]
                 pred_time = last_time + pd.Timedelta(minutes=30)
                 
+                pred_color = '#22c55e' if prediction['predicted_direction'] == 'up' else '#ef4444'
+                
                 fig.add_trace(go.Scatter(
                     x=[last_time, pred_time],
                     y=[current['current_price'], prediction['predicted_price']],
                     mode='lines+markers',
-                    name='Prediction',
-                    line=dict(color='#22c55e' if prediction['predicted_direction'] == 'up' else '#ef4444', 
-                             width=2, dash='dash'),
-                    marker=dict(size=10)
+                    name='Prediction (30m)',
+                    line=dict(
+                        color=pred_color,
+                        width=3,
+                        dash='dash'
+                    ),
+                    marker=dict(
+                        size=12,
+                        color=pred_color,
+                        line=dict(width=2, color='white')
+                    ),
+                    hovertemplate='<b>%{fullData.name}</b><br>$%{y:,.2f}<extra></extra>'
                 ))
         except:
             pass
         
+        # Add current price line
+        fig.add_hline(
+            y=current['current_price'],
+            line_dash="dot",
+            line_color="#94a3b8",
+            annotation_text=f"Current: ${current['current_price']:,.2f}",
+            annotation_position="right",
+            annotation_font_size=10,
+            annotation_font_color="#94a3b8"
+        )
+        
         fig.update_layout(
             plot_bgcolor='rgba(0,0,0,0)',
             paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='#e2e8f0'),
+            font=dict(color='#e2e8f0', size=11),
             xaxis=dict(
                 showgrid=True,
-                gridcolor='rgba(100,100,100,0.2)',
-                title=None
+                gridcolor='rgba(100,100,100,0.15)',
+                title=None,
+                showspikes=True,
+                spikecolor="#94a3b8",
+                spikethickness=1
             ),
             yaxis=dict(
                 showgrid=True,
-                gridcolor='rgba(100,100,100,0.2)',
+                gridcolor='rgba(100,100,100,0.15)',
                 title='Price (USD)',
-                tickprefix='$'
+                tickprefix='$',
+                range=[y_min, y_max],
+                tickformat=',.0f'
             ),
             legend=dict(
                 orientation='h',
                 yanchor='bottom',
                 y=1.02,
                 xanchor='right',
-                x=1
+                x=1,
+                font=dict(size=10)
             ),
-            margin=dict(l=0, r=0, t=30, b=0),
-            height=400
+            margin=dict(l=60, r=20, t=40, b=40),
+            height=450,
+            hovermode='x unified'
         )
         
         st.plotly_chart(fig, use_container_width=True)
+        
+        # Add price stats below chart
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("24h High", f"${price_max:,.2f}")
+        with col2:
+            st.metric("24h Low", f"${price_min:,.2f}")
+        with col3:
+            st.metric("24h Range", f"${price_range:,.2f}")
+        with col4:
+            range_pct = (price_range / price_center) * 100
+            st.metric("Volatility", f"{range_pct:.2f}%")
     
     # Model info section
     st.markdown("---")

@@ -1,0 +1,1222 @@
+# CryptoSentinel - Complete Codebase Documentation
+
+## Table of Contents
+
+1. [Project Overview](#project-overview)
+2. [System Architecture](#system-architecture)
+3. [Directory Structure & File Purposes](#directory-structure--file-purposes)
+4. [Data Flow & Pipeline Orchestration](#data-flow--pipeline-orchestration)
+5. [Core Components](#core-components)
+6. [Machine Learning Models](#machine-learning-models)
+7. [Automation & Orchestration](#automation--orchestration)
+8. [Integration Points](#integration-points)
+9. [Deployment Flow](#deployment-flow)
+10. [How Everything Works Together](#how-everything-works-together)
+
+---
+
+## Project Overview
+
+**CryptoSentinel** is an end-to-end MLOps system for real-time Bitcoin price prediction. It combines:
+- **Real-time data ingestion** from CoinGecko API
+- **Automated feature engineering** with 40+ technical indicators
+- **Multiple ML models** for price regression, direction classification, and market regime identification
+- **Model explainability** using SHAP and LIME
+- **Automated pipelines** orchestrated by Prefect and GitHub Actions
+- **Feature Store and Model Registry** via Hopsworks
+- **Interactive dashboard** deployed on Hugging Face Spaces
+
+### Key Technologies
+- **Backend**: FastAPI (Python 3.11)
+- **Frontend**: Streamlit
+- **Orchestration**: Prefect Cloud + GitHub Actions (dual failsafe)
+- **Feature Store**: Hopsworks
+- **Model Registry**: Hopsworks
+- **Deployment**: Hugging Face Spaces (Docker)
+- **ML Testing**: DeepChecks (drift detection)
+
+---
+
+## System Architecture
+
+The system follows a layered architecture:
+
+EXTERNAL DATA SOURCE (CoinGecko API)
+    |
+    v
+AUTOMATION LAYER (GitHub Actions Primary, Prefect Cloud Failsafe)
+    |
+    v
+PIPELINE LAYER (Feature Pipeline, Training Pipeline, Inference Pipeline)
+    |
+    v
+STORAGE LAYER (Hopsworks Feature Store, Hopsworks Model Registry)
+    |
+    v
+APPLICATION LAYER (FastAPI Backend, Streamlit UI)
+    |
+    v
+DEPLOYMENT LAYER (Hugging Face Spaces)
+
+---
+
+## Directory Structure & File Purposes
+
+### Root Level Files
+
+#### dashboard.py
+**Purpose**: Main Streamlit application entry point
+**Key Functions**:
+- Configures Streamlit page layout and navigation
+- Initializes background scheduler for pipelines
+- Routes to different pages based on user selection
+- Manages session state and model status display
+
+**How it works**:
+- Sets up custom CSS for dark theme
+- Creates sidebar navigation with 8 pages
+- Starts background scheduler on first load
+- Routes user to selected page (Dashboard, Predictions, Model Insights, etc.)
+
+#### run_all.py
+**Purpose**: Convenience script to run all three pipelines sequentially
+**Usage**: python run_all.py
+**What it does**:
+1. Runs feature pipeline (fetch data, engineer features, store)
+2. Runs training pipeline (train models, register)
+3. Runs inference pipeline (generate prediction)
+
+**Why it exists**: Simplifies local testing and initial setup
+
+#### Dockerfile
+**Purpose**: Containerizes the entire application for Hugging Face deployment
+**Key Steps**:
+1. Uses python:3.11-slim base image
+2. Installs system dependencies (build-essential, curl, git)
+3. Installs Python packages from requirements.txt
+4. Copies application code
+5. Exposes port 7860 (Hugging Face default)
+6. Runs streamlit run dashboard.py as entry point
+
+**Why Docker**: Ensures consistent deployment across environments
+
+---
+
+### app/ Directory - Core Application Logic
+
+#### app/config.py
+**Purpose**: Centralized configuration management
+**Key Settings**:
+- API configuration (host, port, debug mode)
+- Data settings (symbol, history hours, prediction horizon)
+- Model parameters (RSI period, MACD settings, cluster count)
+- Paths (model directories, base directory)
+- Hopsworks credentials (loaded from Prefect variables or env vars)
+
+**Why Pydantic Settings**: Type validation, environment variable loading, .env file support
+
+#### app/data_fetcher.py
+**Purpose**: Data ingestion from CoinGecko API
+**Functions**:
+- fetch_current_price(): Gets current BTC price and 24h change
+- fetch_price_history(hours): Gets historical price data (timestamps + prices)
+- fetch_ohlcv_data(hours): Gets OHLCV candle data
+- fetch_market_data(): Gets comprehensive market metrics
+
+**Data Format**:
+- Returns list of dictionaries with timestamp (milliseconds), price, and formatted time
+- Handles API errors with retries and logging
+
+**Why CoinGecko**: Free API, reliable, no authentication needed for basic data
+
+#### app/feature_engineering.py
+**Purpose**: Transforms raw price data into ML-ready features
+**Key Functions**:
+- calculate_rsi(): Relative Strength Index (14-period)
+- calculate_macd(): Moving Average Convergence Divergence (12, 26, 9)
+- calculate_bollinger_bands(): Upper, middle, lower bands (20-period, 2 std dev)
+- calculate_moving_averages(): SMA and EMA for 5, 10, 20 periods
+- calculate_volatility(): Annualized volatility (20-period rolling)
+- calculate_momentum(): Price change over N periods
+- calculate_rate_of_change(): Percentage change over N periods
+
+**Feature Categories** (40+ total):
+1. Technical Indicators: RSI, MACD, Bollinger Bands
+2. Moving Averages: SMA_5, SMA_10, SMA_20, EMA_5, EMA_10, EMA_20
+3. Derived Features: Price-to-SMA ratios, BB position/width
+4. Volatility & Momentum: Volatility, momentum_10, ROC_10
+5. Returns: Returns, log_returns, lagged returns (1,2,3,5,10)
+6. Lag Features: Price lags (1,2,3,5,10)
+7. Time Features: Hour, day_of_week, is_weekend
+
+**Why These Features**: Capture market dynamics (trend, momentum, volatility, mean reversion)
+
+#### app/model_trainer.py
+**Purpose**: Trains multiple ML models and selects the best one
+**Models Trained**:
+
+1. Regression Models (Price Prediction):
+   - XGBoost Regressor: 100 estimators, max_depth=6, learning_rate=0.1
+   - Random Forest Regressor: 100 estimators, max_depth=10
+   - Gradient Boosting Regressor: 100 estimators, max_depth=5, learning_rate=0.1
+   - Ridge Regression: L2 regularization, alpha=1.0 (baseline)
+
+2. Classification Model (Direction Prediction):
+   - Gradient Boosting Classifier: Predicts up/down movement
+
+3. Clustering Model (Market Regime):
+   - K-Means Clustering: 4 clusters with PCA dimensionality reduction
+
+**Training Process**:
+1. Splits data 80/20 (train/test)
+2. Scales features using StandardScaler
+3. Trains all models
+4. Evaluates on test set (RMSE, MAE, R² for regression; accuracy, precision, recall, F1 for classification)
+5. Selects best regression model based on validation RMSE
+6. Saves all models + metadata + scaler
+
+**Why Multiple Models**: Ensemble approach provides robustness; best model selected automatically
+
+#### app/predictor.py
+**Purpose**: Loads models and generates predictions
+**Key Components**:
+
+**ModelLoader Class**:
+- Loads models from local directory or Hopsworks Model Registry
+- Manages scaler, metadata, and model dictionary
+- Provides is_loaded property and best_model_name
+
+**Prediction Generation** (generate_prediction()):
+1. Ensures models are loaded (tries local, then Hopsworks)
+2. Extracts features from current data
+3. Scales features using saved scaler
+4. Gets predictions from all regression models
+5. Uses best model's prediction as primary
+6. Determines direction by comparing predicted_price vs current_price
+7. Optionally uses classifier for confidence (if agrees with price direction)
+8. Identifies market regime using K-Means + PCA
+9. Stores prediction in history buffer (max 50 entries)
+
+**Prediction Validation** (validate_predictions()):
+- Checks if target time (30 minutes after prediction) has arrived
+- Fetches actual price at target time
+- Compares predicted direction vs actual direction
+- Applies tolerance (0.1%) to filter noise
+- Marks predictions as "correct" or "incorrect"
+- Calculates error amount
+
+**Why This Approach**: Price-based direction is always correct; classifier provides confidence boost
+
+#### app/explainer.py
+**Purpose**: Model explainability using SHAP and LIME
+**Functions**:
+
+**SHAP Analysis** (get_shap_values()):
+- Uses TreeExplainer for tree-based models (XGBoost, RF, GB)
+- Uses generic Explainer for linear models (Ridge)
+- Calculates feature contributions to individual predictions
+- Returns top features with their impact (positive = increases prediction, negative = decreases)
+
+**LIME Analysis** (get_lime_explanation()):
+- Creates local interpretable model-agnostic explanations
+- Perturbs input data around the instance
+- Trains simple model on perturbed data
+- Explains why THIS specific prediction was made
+- Returns top features affecting this prediction
+
+**Feature Importance** (get_feature_importance()):
+- Extracts feature importances from trained models
+- Uses feature_importances_ for tree models
+- Uses coef_ (absolute) for linear models
+
+**Why Both SHAP and LIME**: SHAP provides global understanding; LIME provides local, instance-specific explanations
+
+#### app/drift_detection.py
+**Purpose**: Detects data drift using DeepChecks
+**Key Functions**:
+
+**set_reference_data()**: Sets baseline data after training (called in training pipeline)
+
+**detect_drift()**: Compares current data against reference
+- Uses DeepChecks DatasetDrift check
+- Calculates drift score (0-1, higher = more drift)
+- Threshold: 0.3 (configurable)
+- Falls back to KS-test if DeepChecks unavailable
+- Returns feature-level drift breakdown
+
+**Why Drift Detection**: Ensures model performance doesn't degrade as market conditions change
+
+#### app/alerts.py
+**Purpose**: Generates alerts for significant price movements
+**Alert Conditions**:
+- Large price changes (>5% in 24h)
+- High volatility (>0.5)
+- Extreme predictions (deviation >3%)
+- Drawdown from peak (>10%)
+
+**Why Alerts**: Notifies users of potentially significant market events
+
+#### app/scheduler.py
+**Purpose**: Background scheduler for pipelines in Streamlit app
+**Functions**:
+- start_scheduler(): Starts background thread running pipelines
+- _scheduler_loop(): Main loop that runs feature pipeline every 5 min, training every 30 min
+- get_scheduler_status(): Returns last run times
+
+**Why Background Scheduler**: Enables pipelines to run automatically when Streamlit app is active (Hugging Face deployment)
+
+---
+
+### pipelines/ Directory - Prefect Workflows
+
+#### pipelines/feature_pipeline.py
+**Purpose**: Prefect flow for data ingestion and feature engineering
+**Tasks**:
+1. fetch_price_data: Fetches 24 hours of price data from CoinGecko
+2. engineer_features_task: Computes technical indicators
+3. store_features_task: Uploads to Hopsworks Feature Store (with deduplication)
+
+**Schedule**: Every 5 minutes (via GitHub Actions cron)
+**Returns**: Success status, rows processed, duration
+
+**Why Prefect**: Provides task dependencies, retries, logging, and workflow visualization
+
+#### pipelines/training_pipeline.py
+**Purpose**: Prefect flow for model training and registration
+**Tasks**:
+1. load_features: Loads historical data from Hopsworks Feature Store
+2. check_drift_task: Detects data drift using DeepChecks
+3. prepare_training_data: Prepares X (features) and y (targets)
+4. train_all_models: Trains all regression, classification, and clustering models
+5. save_and_register_models: Saves locally and registers in Hopsworks Model Registry
+6. set_drift_baseline_task: Updates reference data for next drift check
+
+**Schedule**: Every 30 minutes (via GitHub Actions cron, offset by 1 minute from feature pipeline)
+**Returns**: Best model, metrics, samples trained, drift report
+
+**Why 30 Minutes**: Balances model freshness with computational cost
+
+#### pipelines/inference_pipeline.py
+**Purpose**: Prefect flow for generating predictions
+**Tasks**:
+1. get_current_data: Fetches current price and recent history
+2. prepare_features: Engineers features from history
+3. run_prediction: Generates prediction using loaded models
+4. validate_past_predictions: Validates predictions whose target time has arrived
+5. check_for_alerts: Checks alert conditions
+
+**Schedule**: Every 5 minutes (via FastAPI scheduler)
+**Returns**: Current price, prediction, alerts, duration
+
+**Why Separate Pipeline**: Enables independent scheduling and monitoring
+
+---
+
+### storage/ Directory - Hopsworks Integration
+
+#### storage/feature_store.py
+**Purpose**: Manages feature storage in Hopsworks Feature Store
+**Key Functions**:
+
+**_connect()**: Establishes connection to Hopsworks using API key
+- Caches connection to avoid re-authentication
+- Handles errors gracefully
+
+**get_or_create_feature_group()**: Gets or creates feature group "crypto_features"
+- Primary key: timestamp
+- Online enabled for real-time queries
+- Version 1
+
+**store_features()**: Stores features with deduplication
+- Fetches existing timestamps (last 2000 rows)
+- Filters out duplicate timestamps before insert
+- Only inserts NEW data (prevents "0 rows processed" issue)
+- Falls back to local storage if Hopsworks unavailable
+
+**fetch_features()**: Retrieves features from Feature Store
+- Returns pandas DataFrame
+- Falls back to local parquet file if Hopsworks unavailable
+
+**Why Hopsworks Feature Store**: Centralized feature management, versioning, and online serving
+
+#### storage/model_registry.py
+**Purpose**: Manages model versioning in Hopsworks Model Registry
+**Key Functions**:
+
+**_connect()**: Establishes connection to Hopsworks Model Registry
+
+**register_model_bundle()**: Registers complete model bundle
+- Saves all models, scaler, and metadata to temporary directory
+- Uploads to Hopsworks Model Registry
+- Returns Hopsworks model object with version
+
+**get_latest_model()**: Retrieves latest model version
+- Downloads model bundle from Hopsworks
+- Returns models, scaler, and metadata dictionary
+
+**Why Hopsworks Model Registry**: Model versioning, automatic promotion, and centralized model management
+
+---
+
+### api/ Directory - FastAPI Backend
+
+#### api/main.py
+**Purpose**: FastAPI application with scheduled pipelines
+**Key Components**:
+
+**Lifespan Events**:
+- Startup: Loads models, starts AsyncIOScheduler
+- Shutdown: Stops scheduler gracefully
+
+**Scheduled Jobs**:
+- Inference Pipeline: Every 5 minutes (generates predictions)
+- Training Pipeline: Every 30 minutes (retrains models)
+
+**Endpoints**:
+- GET /: Health check
+- GET /health: Detailed health check (models loaded, scheduler status)
+- All routes from api/routes.py (prefixed with /api)
+
+**Why FastAPI**: High performance, async support, automatic API documentation
+
+#### api/routes.py
+**Purpose**: REST API endpoints for predictions and model info
+**Endpoints**:
+- GET /api/predict: Generate prediction
+- GET /api/prediction-history: Get prediction history
+- GET /api/model-info: Get model information
+- POST /api/explain: Get SHAP/LIME explanations
+
+**Why REST API**: Enables programmatic access and integration with other systems
+
+---
+
+### pages/ Directory - Streamlit UI Pages
+
+#### pages/home.py
+**Purpose**: Main dashboard page
+**Displays**:
+- Current Bitcoin price with 24h change
+- Predicted price (30 minutes ahead)
+- Predicted direction (Bullish/Bearish) with confidence
+- Market regime (accumulation, uptrend, distribution, downtrend)
+- Price history chart with prediction marker
+- Model information
+- Prediction accuracy statistics
+
+#### pages/predictions.py
+**Purpose**: Prediction history and validation
+**Features**:
+- Current prediction display
+- Historical predictions table (Time, Current, Predicted, Direction, Actual, Error, Status)
+- Filters: "Show only validated", "Filter by result" (All/Correct/Incorrect)
+- Performance statistics (Accuracy, Validated count, Correct count, Avg Error)
+- Automatic validation when page is viewed
+- Timestamps displayed in GMT+5 timezone
+
+#### pages/model_insights.py
+**Purpose**: Model explainability and comparison
+**Tabs**:
+1. SHAP Analysis: Bar chart of top feature contributions
+2. LIME Explanation: Local explanation for current prediction
+3. Feature Importance: Top 15 features with importance scores
+4. Model Comparison: Table of RMSE, MAE, R² for all models; RMSE bar chart
+
+**Why This Page**: Builds trust in model decisions and helps identify important features
+
+#### pages/data_analysis.py
+**Purpose**: Exploratory data analysis
+**Features**:
+- Price trends
+- Feature correlations
+- Distribution plots
+- Time series analysis
+
+#### pages/drift_page.py
+**Purpose**: Data drift detection and monitoring
+**Features**:
+- Current drift status (detected/not detected)
+- Drift score gauge chart
+- Feature-level drift breakdown
+- Recommendations (retrain if drift detected)
+- Two buttons:
+  - "Check Drift Only": Fast check without retraining
+  - "Train & Update Baseline": Full training pipeline + baseline update
+
+#### pages/alerts_page.py
+**Purpose**: Display system alerts
+**Features**:
+- List of active alerts
+- Alert severity and timestamps
+- Alert history
+
+#### pages/pipeline_control.py
+**Purpose**: Manual pipeline control and monitoring
+**Features**:
+- Manual trigger buttons for each pipeline
+- Scheduler status (last run times)
+- Pipeline execution history
+- Configuration display
+
+#### pages/about.py
+**Purpose**: Project documentation and architecture overview
+
+---
+
+### .github/workflows/ Directory - CI/CD Automation
+
+#### .github/workflows/feature-pipeline.yml
+**Purpose**: Automated feature pipeline execution
+**Triggers**:
+- Schedule: Every 5 minutes (*/5 * * * *)
+- Manual: workflow_dispatch with optional hours parameter
+
+**Steps**:
+1. Checkout repository
+2. Set up Python 3.11
+3. Install dependencies
+4. Run feature pipeline (with Hopsworks secrets)
+5. Notify on failure (creates GitHub issue)
+
+**Why GitHub Actions**: Reliable scheduling, free for public repos, integrates with Git
+
+#### .github/workflows/training-pipeline.yml
+**Purpose**: Automated training pipeline execution
+**Triggers**:
+- Schedule: Every 30 minutes at :16 and :46 (16,46 * * * *)
+- Manual: workflow_dispatch
+
+**Steps**:
+1. Checkout repository
+2. Set up Python 3.11
+3. Install dependencies
+4. Run training pipeline (with Hopsworks secrets)
+5. Upload model artifacts (for debugging)
+6. Notify on success/failure
+
+**Why Offset Schedule**: Ensures feature pipeline runs first, so training has fresh data
+
+#### .github/workflows/deploy_to_hf.yml
+**Purpose**: Automated deployment to Hugging Face Spaces
+**Triggers**:
+- Push to main branch: Automatic deployment
+- Manual: workflow_dispatch
+
+**Steps**:
+1. Checkout repository
+2. Set up Python 3.11
+3. Install huggingface_hub
+4. Verify project structure
+5. Upload entire project to Hugging Face Space (using HF_TOKEN secret)
+6. Triggers Space rebuild
+
+**Why Automated Deployment**: Zero-downtime updates, version control integration
+
+#### .github/workflows/ci.yml
+**Purpose**: Continuous Integration - Code quality checks
+**Triggers**:
+- Push to master branch
+- Pull requests to master
+
+**Steps**:
+1. Checkout repository
+2. Set up Python 3.11
+3. Install dependencies
+4. Lint with Ruff
+5. Check imports (verify all dependencies work)
+6. Verify project structure
+
+**Why CI**: Prevents broken code from being deployed
+
+#### .github/workflows/cd.yml
+**Purpose**: Continuous Deployment - Docker build validation
+**Triggers**:
+- Push to master branch
+- Pull requests to master
+
+**Steps**:
+1. Checkout repository
+2. Set up Docker Buildx
+3. Build Docker image
+4. Test Docker image (smoke test)
+5. Verify image size
+6. Security scan (optional)
+
+**Why CD**: Ensures Docker image builds correctly before deployment
+
+---
+
+## Data Flow & Pipeline Orchestration
+
+### Complete Data Flow
+
+1. EXTERNAL DATA SOURCE
+   CoinGecko API
+   |
+   v
+2. FEATURE PIPELINE (Every 5 minutes)
+   ├─ Fetch price history (24 hours)
+   ├─ Engineer features (40+ indicators)
+   └─ Store in Hopsworks Feature Store
+      |
+      v
+3. TRAINING PIPELINE (Every 30 minutes)
+   ├─ Load features from Hopsworks
+   ├─ Check for data drift
+   ├─ Prepare training data (80/20 split)
+   ├─ Train models (XGBoost, RF, GB, Ridge, Classifier, K-Means)
+   ├─ Select best model (lowest RMSE)
+   ├─ Save models locally
+   ├─ Register in Hopsworks Model Registry
+   └─ Set drift baseline
+      |
+      v
+4. INFERENCE PIPELINE (Every 5 minutes)
+   ├─ Fetch current price
+   ├─ Engineer features
+   ├─ Generate prediction (using best model)
+   ├─ Validate past predictions
+   └─ Check for alerts
+      |
+      v
+5. STREAMLIT DASHBOARD
+   ├─ Display current prediction
+   ├─ Show prediction history
+   ├─ Model insights (SHAP, LIME)
+   └─ Data analysis
+
+### Dual Orchestration System
+
+**Primary**: GitHub Actions (Reliable, Free, Git-integrated)
+- Feature pipeline: Every 5 minutes
+- Training pipeline: Every 30 minutes (offset by 1 minute)
+
+**Failsafe**: Prefect Cloud (Workflow orchestration, logging, visualization)
+- Can be deployed as backup
+- Provides workflow visualization and monitoring
+- Automatic retries and error handling
+
+**Why Dual System**: Redundancy ensures pipelines run even if one system fails
+
+---
+
+## Core Components
+
+### 1. Data Ingestion (app/data_fetcher.py)
+
+**What it does**: Fetches Bitcoin price data from CoinGecko API
+
+**Key Functions**:
+- fetch_current_price(): Current price + 24h change
+- fetch_price_history(hours): Historical prices with timestamps
+- fetch_ohlcv_data(hours): OHLCV candles
+- fetch_market_data(): Comprehensive market metrics
+
+**Data Format**:
+{
+    "timestamp": 1703123456789,  # milliseconds
+    "price": 86962.50,
+    "time": "08:41 PM"
+}
+
+**Error Handling**: Retries, timeouts, logging
+
+### 2. Feature Engineering (app/feature_engineering.py)
+
+**What it does**: Transforms raw price data into 40+ ML-ready features
+
+**Feature Categories**:
+
+**A. Technical Indicators**:
+- RSI (14-period): Momentum oscillator (0-100)
+- MACD (12, 26, 9): Trend-following momentum indicator
+- Bollinger Bands (20-period, 2 std dev): Volatility bands
+
+**B. Moving Averages**:
+- SMA: Simple Moving Average (5, 10, 20 periods)
+- EMA: Exponential Moving Average (5, 10, 20 periods)
+- Ratios: Price-to-SMA_20, SMA_5-to-SMA_20
+
+**C. Volatility & Momentum**:
+- Volatility: Annualized volatility (20-period rolling)
+- Momentum: Price change over 10 periods
+- ROC: Rate of Change (percentage change over 10 periods)
+
+**D. Returns**:
+- Returns: Percentage returns
+- Log Returns: Logarithmic returns
+- Lagged Returns: Returns at lags 1, 2, 3, 5, 10
+
+**E. Lag Features**:
+- Price Lags: Price at lags 1, 2, 3, 5, 10
+- Returns Lags: Returns at lags 1, 2, 3, 5, 10
+
+**F. Time Features**:
+- Hour: Hour of day (0-23)
+- Day of Week: Day of week (0-6)
+- Is Weekend: Binary indicator
+
+**Why These Features**: Capture trend, momentum, volatility, mean reversion, and temporal patterns
+
+### 3. Model Training (app/model_trainer.py)
+
+**What it does**: Trains multiple ML models and selects the best one
+
+**Training Process**:
+1. Data Preparation:
+   - Load features from Hopsworks Feature Store
+   - Split 80/20 (train/test)
+   - Scale features using StandardScaler
+
+2. Model Training:
+   - Train 4 regression models (XGBoost, RF, GB, Ridge)
+   - Train 1 classification model (Gradient Boosting Classifier)
+   - Train 1 clustering model (K-Means with PCA)
+
+3. Model Evaluation:
+   - Regression: RMSE, MAE, R²
+   - Classification: Accuracy, Precision, Recall, F1
+   - Select best regression model (lowest RMSE)
+
+4. Model Saving:
+   - Save all models + scaler + metadata
+   - Promote best model to models/active/
+   - Register in Hopsworks Model Registry
+
+**Why Multiple Models**: Ensemble approach provides robustness; best model selected automatically
+
+### 4. Prediction Generation (app/predictor.py)
+
+**What it does**: Loads models and generates price predictions
+
+**Prediction Process**:
+1. Model Loading:
+   - Try local directory first (models/active/)
+   - Fallback to Hopsworks Model Registry if local unavailable
+
+2. Feature Extraction:
+   - Fetch current price and recent history
+   - Engineer features using same pipeline as training
+
+3. Prediction:
+   - Scale features using saved scaler
+   - Get predictions from all regression models
+   - Use best model's prediction as primary
+   - Determine direction: predicted_price > current_price = UP, else DOWN
+   - Use classifier for confidence (if agrees with price direction)
+   - Identify market regime using K-Means + PCA
+
+4. Storage:
+   - Store prediction in history buffer (max 50 entries)
+   - Include timestamp, target timestamp, prices, direction, confidence
+
+**Prediction Validation**:
+- Checks if target time (30 minutes after prediction) has arrived
+- Fetches actual price at target time (within 5-minute window)
+- Compares predicted direction vs actual direction
+- Applies tolerance (0.1%) to filter noise
+- Marks as "correct" or "incorrect"
+
+**Why Price-Based Direction**: Always correct; classifier can disagree but doesn't override
+
+### 5. Model Explainability (app/explainer.py)
+
+**What it does**: Provides interpretable explanations for predictions
+
+**SHAP Analysis**:
+- Uses TreeExplainer for tree-based models
+- Calculates feature contributions to individual predictions
+- Shows which features push prediction higher/lower
+- Returns top 10 features with their impact
+
+**LIME Analysis**:
+- Creates local, instance-specific explanations
+- Perturbs input data around the instance
+- Trains simple model on perturbed data
+- Explains why THIS specific prediction was made
+- Returns top features affecting this prediction
+
+**Feature Importance**:
+- Extracts feature importances from trained models
+- Uses feature_importances_ for tree models
+- Uses coef_ (absolute) for linear models
+
+**Why Both SHAP and LIME**: SHAP provides global understanding; LIME provides local explanations
+
+### 6. Drift Detection (app/drift_detection.py)
+
+**What it does**: Monitors data drift to ensure model performance
+
+**Process**:
+1. Baseline Setting: After training, reference data is stored
+2. Drift Detection: Compares current data against reference
+   - Uses DeepChecks DatasetDrift check
+   - Calculates drift score (0-1, higher = more drift)
+   - Threshold: 0.3 (configurable)
+   - Falls back to KS-test if DeepChecks unavailable
+3. Feature-Level Analysis: Identifies which features have drifted
+4. Recommendations: Suggests retraining if drift detected
+
+**Why Drift Detection**: Ensures model performance doesn't degrade as market conditions change
+
+---
+
+## Machine Learning Models
+
+### Why These Models Were Chosen
+
+#### 1. XGBoost Regressor (Best Model)
+
+**Why**: 
+- Gradient Boosting: Sequential error correction, learns from mistakes
+- Tree-Based: Handles non-linear relationships
+- Regularization: Prevents overfitting
+- Performance: Typically achieves lowest RMSE
+
+**Configuration**:
+- n_estimators=100: Balance between performance and speed
+- max_depth=6: Prevents overfitting while capturing interactions
+- learning_rate=0.1: Conservative learning for stability
+
+**Use Case**: Primary price prediction model
+
+#### 2. Random Forest Regressor
+
+**Why**:
+- Ensemble Method: Averages multiple decision trees
+- Robust: Less prone to overfitting than single trees
+- Feature Importance: Provides interpretability
+- Baseline Comparison: Shows ensemble vs single model
+
+**Configuration**:
+- n_estimators=100: Sufficient trees for stability
+- max_depth=10: Deeper trees for complex patterns
+
+**Use Case**: Secondary price prediction, comparison
+
+#### 3. Gradient Boosting Regressor
+
+**Why**:
+- Sequential Learning: Each tree corrects previous errors
+- Flexible: Can capture complex patterns
+- Comparison: Shows different boosting approach vs XGBoost
+
+**Configuration**:
+- n_estimators=100: Consistent with other models
+- max_depth=5: Shallower than RF to prevent overfitting
+- learning_rate=0.1: Conservative learning
+
+**Use Case**: Tertiary price prediction, comparison
+
+#### 4. Ridge Regression (Baseline)
+
+**Why**:
+- Linear Model: Simple, interpretable baseline
+- Regularization: L2 penalty prevents overfitting
+- Comparison: Shows how much non-linear models improve
+
+**Configuration**:
+- alpha=1.0: Moderate regularization
+
+**Use Case**: Baseline comparison, linear benchmark
+
+#### 5. Gradient Boosting Classifier
+
+**Why**:
+- Direction Prediction: Classifies up/down movement
+- Confidence Scores: Provides probability estimates
+- Non-Linear: Captures complex patterns in direction
+- Gradient Boosting: Sequential learning for classification
+
+**Configuration**:
+- n_estimators=100: Consistent with regression models
+- max_depth=5: Prevents overfitting
+- learning_rate=0.1: Conservative learning
+
+**Use Case**: Direction prediction, confidence estimation
+
+**Important Note**: The classifier's output is used for confidence, but the actual direction is determined by comparing predicted_price vs current_price. If classifier disagrees, price-based direction takes precedence.
+
+#### 6. K-Means Clustering (Market Regime)
+
+**Why**:
+- Market Regimes: Identifies different market conditions
+- Unsupervised: Discovers patterns without labels
+- PCA Dimensionality Reduction: Reduces feature space before clustering
+- 4 Clusters: Accumulation, Uptrend, Distribution, Downtrend
+
+**Configuration**:
+- n_clusters=4: Four market regimes
+- PCA components: min(5, feature_count): Reduces dimensionality
+- random_state=42: Reproducible results
+
+**Use Case**: Market regime identification, context for predictions
+
+---
+
+## Automation & Orchestration
+
+### GitHub Actions Workflows
+
+#### Feature Pipeline Workflow (.github/workflows/feature-pipeline.yml)
+
+**Trigger**: Every 5 minutes (cron: */5 * * * *)
+
+**What it does**:
+1. Checks out repository
+2. Sets up Python 3.11 environment
+3. Installs dependencies from requirements.txt
+4. Runs feature_pipeline.py with Hopsworks secrets
+5. Creates GitHub issue on failure
+
+**Why Every 5 Minutes**: Keeps features fresh for real-time predictions
+
+**Secrets Required**:
+- HOPSWORKS_API_KEY
+- HOPSWORKS_PROJECT_NAME
+
+#### Training Pipeline Workflow (.github/workflows/training-pipeline.yml)
+
+**Trigger**: Every 30 minutes at :16 and :46 (cron: 16,46 * * * *)
+
+**What it does**:
+1. Checks out repository
+2. Sets up Python 3.11 environment
+3. Installs dependencies
+4. Runs training_pipeline.py with Hopsworks secrets
+5. Uploads model artifacts (for debugging)
+6. Creates GitHub issue on failure
+
+**Why Offset Schedule**: Ensures feature pipeline runs first (at :00, :05, :10, :15, etc.), so training has fresh data
+
+**Why Every 30 Minutes**: Balances model freshness with computational cost
+
+#### Deploy to Hugging Face Workflow (.github/workflows/deploy_to_hf.yml)
+
+**Trigger**: Push to main branch
+
+**What it does**:
+1. Checks out repository
+2. Sets up Python 3.11
+3. Installs huggingface_hub
+4. Verifies project structure
+5. Uploads entire project to Hugging Face Space
+6. Triggers Space rebuild
+
+**Secrets Required**:
+- HF_TOKEN
+- HF_REPO_ID (set in workflow)
+
+**Why Automated**: Zero-downtime updates, version control integration
+
+#### CI Pipeline (.github/workflows/ci.yml)
+
+**Trigger**: Push to master, Pull requests
+
+**What it does**:
+1. Checks out repository
+2. Sets up Python 3.11
+3. Installs dependencies
+4. Lints code with Ruff
+5. Checks imports (verifies dependencies)
+6. Verifies project structure
+
+**Why CI**: Prevents broken code from being deployed
+
+#### CD Pipeline (.github/workflows/cd.yml)
+
+**Trigger**: Push to master, Pull requests
+
+**What it does**:
+1. Checks out repository
+2. Sets up Docker Buildx
+3. Builds Docker image
+4. Tests Docker image (smoke test)
+5. Verifies image size
+6. Security scan (optional)
+
+**Why CD**: Ensures Docker image builds correctly before deployment
+
+### Prefect Cloud Integration
+
+**Purpose**: Workflow orchestration with visualization and monitoring
+
+**Features**:
+- Task dependencies and retries
+- Workflow visualization
+- Automatic logging
+- Error handling
+
+**Deployment**: Can be deployed as failsafe backup to GitHub Actions
+
+**Why Prefect**: Provides professional workflow management, but GitHub Actions is primary for reliability
+
+### FastAPI Scheduler
+
+**Location**: api/main.py
+
+**Purpose**: Runs pipelines within the FastAPI application
+
+**Scheduled Jobs**:
+- Inference Pipeline: Every 5 minutes
+- Training Pipeline: Every 30 minutes
+
+**Why FastAPI Scheduler**: Enables pipelines to run even when GitHub Actions is unavailable
+
+### Streamlit Background Scheduler
+
+**Location**: app/scheduler.py
+
+**Purpose**: Runs pipelines in background when Streamlit app is active
+
+**Scheduled Jobs**:
+- Feature Pipeline: Every 5 minutes
+- Training Pipeline: Every 30 minutes
+
+**Why Background Scheduler**: Enables automatic pipeline execution on Hugging Face Spaces
+
+---
+
+## Integration Points
+
+### Hopsworks Feature Store
+
+**Purpose**: Centralized feature storage and versioning
+
+**Integration Points**:
+1. Feature Pipeline: Stores engineered features after each run
+2. Training Pipeline: Fetches historical features for training
+3. Deduplication: Prevents duplicate timestamps from being inserted
+
+**Key Functions** (storage/feature_store.py):
+- store_features(): Uploads features with deduplication
+- fetch_features(): Retrieves historical features
+- get_or_create_feature_group(): Manages feature group
+
+**Why Hopsworks**: Centralized feature management, versioning, online serving
+
+### Hopsworks Model Registry
+
+**Purpose**: Model versioning and centralized model management
+
+**Integration Points**:
+1. Training Pipeline: Registers new model versions after training
+2. Predictor: Loads models from registry if local unavailable
+
+**Key Functions** (storage/model_registry.py):
+- register_model_bundle(): Uploads complete model bundle
+- get_latest_model(): Retrieves latest model version
+
+**Why Hopsworks**: Model versioning, automatic promotion, centralized management
+
+### Hugging Face Spaces
+
+**Purpose**: Deployment platform for Streamlit application
+
+**Integration Points**:
+1. Deploy Workflow: Automatically uploads code on push to main
+2. Docker Build: Hugging Face builds Docker image from Dockerfile
+3. Environment Variables: Secrets configured in Hugging Face UI
+
+**Why Hugging Face**: Free hosting, automatic Docker builds, easy deployment
+
+### CoinGecko API
+
+**Purpose**: External data source for Bitcoin prices
+
+**Integration Points**:
+1. Data Fetcher: Fetches current and historical prices
+2. Feature Pipeline: Uses data for feature engineering
+3. Inference Pipeline: Uses data for predictions
+
+**Why CoinGecko**: Free API, reliable, no authentication needed
+
+---
+
+## Deployment Flow
+
+### Complete Deployment Process
+
+1. **Code Push to GitHub**
+   - Developer pushes code to main branch
+   - Triggers CI/CD workflows
+
+2. **CI Pipeline Runs**
+   - Lints code
+   - Checks imports
+   - Verifies project structure
+   - If fails, deployment stops
+
+3. **CD Pipeline Runs**
+   - Builds Docker image
+   - Tests Docker image
+   - Verifies image size
+   - If fails, deployment stops
+
+4. **Deploy to Hugging Face Workflow Runs**
+   - Uploads entire project to Hugging Face Space
+   - Triggers Space rebuild
+
+5. **Hugging Face Builds Docker Image**
+   - Uses Dockerfile from repository
+   - Installs dependencies
+   - Copies application code
+   - Exposes port 7860
+
+6. **Application Starts**
+   - Streamlit dashboard runs on port 7860
+   - Background scheduler starts
+   - Models load from Hopsworks or local
+
+7. **Pipelines Start Running**
+   - Feature pipeline: Every 5 minutes (GitHub Actions)
+   - Training pipeline: Every 30 minutes (GitHub Actions)
+   - Inference pipeline: Every 5 minutes (FastAPI scheduler)
+
+### Local Deployment
+
+**For Development**:
+1. Install dependencies: pip install -r requirements.txt
+2. Set up .env file with Hopsworks credentials
+3. Run pipelines: python run_all.py
+4. Start FastAPI: python -m api.main
+5. Start Streamlit: streamlit run dashboard.py
+
+**For Testing**:
+- Use run_all.py to run all pipelines sequentially
+- Use individual pipeline files for specific testing
+- Use FastAPI endpoints for API testing
+
+---
+
+## How Everything Works Together
+
+### Complete System Flow
+
+**Step 1: Data Ingestion (Every 5 Minutes)**
+- GitHub Actions triggers feature-pipeline.yml
+- Feature pipeline fetches 24 hours of price data from CoinGecko
+- Features are engineered (40+ technical indicators)
+- Features are stored in Hopsworks Feature Store (with deduplication)
+- Process takes ~30-60 seconds
+
+**Step 2: Model Training (Every 30 Minutes)**
+- GitHub Actions triggers training-pipeline.yml (at :16 and :46)
+- Training pipeline loads features from Hopsworks Feature Store
+- Data drift is checked against baseline
+- Training data is prepared (80/20 split, scaled)
+- All models are trained (XGBoost, RF, GB, Ridge, Classifier, K-Means)
+- Best model is selected (lowest RMSE)
+- Models are saved locally and registered in Hopsworks Model Registry
+- Drift baseline is updated
+- Process takes ~2-5 minutes
+
+**Step 3: Prediction Generation (Every 5 Minutes)**
+- FastAPI scheduler triggers inference pipeline
+- Current price is fetched from CoinGecko
+- Features are engineered from recent history
+- Prediction is generated using best model
+- Direction is determined (predicted_price vs current_price)
+- Confidence is calculated (using classifier if available)
+- Market regime is identified (using K-Means)
+- Prediction is stored in history buffer
+- Past predictions are validated (if target time has arrived)
+- Alerts are checked
+- Process takes ~1-2 seconds
+
+**Step 4: User Interaction**
+- User opens Streamlit dashboard (Hugging Face Spaces)
+- Dashboard displays current prediction, history, insights
+- User can view SHAP/LIME explanations
+- User can check drift status
+- User can view alerts
+- Background scheduler runs pipelines if app is active
+
+### Data Flow Diagram
+
+CoinGecko API
+    |
+    v
+Feature Pipeline (GitHub Actions, every 5 min)
+    |
+    v
+Hopsworks Feature Store
+    |
+    v
+Training Pipeline (GitHub Actions, every 30 min)
+    |
+    v
+Hopsworks Model Registry
+    |
+    v
+Inference Pipeline (FastAPI, every 5 min)
+    |
+    v
+Streamlit Dashboard (Hugging Face Spaces)
+
+### Why This Architecture Works
+
+**1. Redundancy**: Dual orchestration (GitHub Actions + Prefect) ensures pipelines run even if one fails
+
+**2. Scalability**: Hopsworks handles feature storage and model versioning at scale
+
+**3. Reliability**: Automated pipelines ensure models stay fresh and predictions are accurate
+
+**4. Explainability**: SHAP and LIME provide interpretable predictions
+
+**5. Monitoring**: Drift detection ensures model performance doesn't degrade
+
+**6. User-Friendly**: Streamlit dashboard provides intuitive interface
+
+**7. Production-Ready**: Docker containerization ensures consistent deployment
+
+### Key Design Decisions
+
+**1. Why Multiple Models?**
+- Ensemble approach provides robustness
+- Best model selected automatically based on performance
+- Allows comparison and analysis
+
+**2. Why Price-Based Direction?**
+- Always correct (predicted_price > current_price = UP)
+- Classifier can disagree but doesn't override
+- Provides confidence boost when classifier agrees
+
+**3. Why 30-Minute Prediction Horizon?**
+- Balances accuracy with usefulness
+- Short enough to be actionable
+- Long enough to capture meaningful trends
+
+**4. Why Dual Orchestration?**
+- GitHub Actions: Reliable, free, Git-integrated
+- Prefect: Professional workflow management, visualization
+- Redundancy ensures continuous operation
+
+**5. Why Hopsworks?**
+- Centralized feature management
+- Model versioning and promotion
+- Online serving capabilities
+- Industry-standard MLOps tool
+
+**6. Why Hugging Face Spaces?**
+- Free hosting for ML applications
+- Automatic Docker builds
+- Easy deployment from Git
+- Community visibility
+
+---
+
+## Conclusion
+
+CryptoSentinel is a complete end-to-end MLOps system that demonstrates production-ready practices:
+- Automated data pipelines
+- Multiple ML models with automatic selection
+- Model explainability (SHAP and LIME)
+- Data drift detection
+- Feature Store and Model Registry integration
+- Dual orchestration for reliability
+- Containerized deployment
+- Interactive dashboard
+
+The system is designed to be robust, scalable, and maintainable, with clear separation of concerns and comprehensive documentation.
+
