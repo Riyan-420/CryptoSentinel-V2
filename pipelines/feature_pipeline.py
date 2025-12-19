@@ -30,7 +30,7 @@ def store_features_task(features_df):
     return success
 
 @flow(name="feature_pipeline")
-def feature_pipeline(hours: int = 2):
+def feature_pipeline(hours: int = 24):
     logger.info("Starting Feature Pipeline")
     start_time = datetime.now()
     price_data = fetch_price_data(hours)
