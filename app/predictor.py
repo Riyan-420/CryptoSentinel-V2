@@ -14,6 +14,17 @@ from app.feature_engineering import get_feature_names
 
 logger = logging.getLogger(__name__)
 
+try:
+    from zoneinfo import ZoneInfo
+    PST = ZoneInfo("America/Los_Angeles")
+except ImportError:
+    try:
+        import pytz
+        PST = pytz.timezone("America/Los_Angeles")
+    except ImportError:
+        PST = None
+        logger.warning("No timezone library available, using system timezone")
+
 # Prediction history buffer (in-memory, max 50 entries)
 prediction_history: deque = deque(maxlen=50)
 
@@ -163,7 +174,10 @@ def generate_prediction(features: pd.DataFrame, current_price: float
             regimes = ["accumulation", "uptrend", "distribution", "downtrend"]
             regime = regimes[cluster % len(regimes)]
         
-        prediction_time = datetime.now()
+        if PST:
+            prediction_time = datetime.now(PST)
+        else:
+            prediction_time = datetime.now()
         target_time = prediction_time + timedelta(minutes=settings.PREDICTION_MINUTES)
         
         result = {
@@ -209,7 +223,10 @@ def validate_predictions(current_price: float = None):
     from app.data_fetcher import fetch_price_history
     
     tolerance_pct = settings.DIRECTION_TOLERANCE_PCT
-    now = datetime.now()
+    if PST:
+        now = datetime.now(PST)
+    else:
+        now = datetime.now()
     
     # Fetch recent price history to check target times
     try:

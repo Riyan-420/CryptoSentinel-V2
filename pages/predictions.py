@@ -4,6 +4,16 @@ import plotly.graph_objects as go
 import pandas as pd
 from datetime import datetime
 
+try:
+    from zoneinfo import ZoneInfo
+    PST = ZoneInfo("America/Los_Angeles")
+except ImportError:
+    try:
+        import pytz
+        PST = pytz.timezone("America/Los_Angeles")
+    except ImportError:
+        PST = None
+
 
 def render():
     """Render predictions page"""
@@ -150,7 +160,18 @@ def render():
                         ts_str = p.get('timestamp', '')
                         if ts_str:
                             ts = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
-                            time_display = ts.strftime('%Y-%m-%d %H:%M:%S')
+                            if PST:
+                                if ts.tzinfo is None:
+                                    try:
+                                        from zoneinfo import ZoneInfo
+                                        ts = ts.replace(tzinfo=ZoneInfo('UTC'))
+                                    except ImportError:
+                                        import pytz
+                                        ts = pytz.UTC.localize(ts)
+                                ts_pst = ts.astimezone(PST)
+                                time_display = ts_pst.strftime('%Y-%m-%d %H:%M:%S')
+                            else:
+                                time_display = ts.strftime('%Y-%m-%d %H:%M:%S')
                         else:
                             time_display = '-'
                     except:
