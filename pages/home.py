@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime
 import pandas as pd
+import time
 
 try:
     from zoneinfo import ZoneInfo
@@ -20,6 +21,15 @@ def render():
     """Render dashboard page"""
     st.markdown('<h1 class="main-header">Bitcoin Dashboard</h1>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Real-time market data and ML predictions</p>', unsafe_allow_html=True)
+    
+    # Auto-refresh every 60 seconds
+    if 'last_refresh' not in st.session_state:
+        st.session_state.last_refresh = time.time()
+    
+    time_since_refresh = time.time() - st.session_state.last_refresh
+    if time_since_refresh > 60:
+        st.session_state.last_refresh = time.time()
+        st.rerun()
     
     # Fetch current data
     try:

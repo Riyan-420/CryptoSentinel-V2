@@ -3,15 +3,34 @@ import requests
 from datetime import datetime
 from typing import List, Dict, Any
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
 COINGECKO_URL = "https://api.coingecko.com/api/v3"
 
+# Rate limiting
+_last_request_time = 0
+_min_request_interval = 1.5  # Minimum 1.5 seconds between requests
+
+
+def _rate_limit():
+    """Simple rate limiting to avoid 429 errors"""
+    global _last_request_time
+    current_time = time.time()
+    time_since_last = current_time - _last_request_time
+    
+    if time_since_last < _min_request_interval:
+        sleep_time = _min_request_interval - time_since_last
+        time.sleep(sleep_time)
+    
+    _last_request_time = time.time()
+
 
 def fetch_current_price() -> Dict[str, Any]:
     """Fetch current Bitcoin price from CoinGecko"""
     try:
+        _rate_limit()
         resp = requests.get(
             f"{COINGECKO_URL}/simple/price",
             params={
@@ -38,6 +57,7 @@ def fetch_current_price() -> Dict[str, Any]:
 def fetch_price_history(hours: int = 24) -> List[Dict[str, Any]]:
     """Fetch historical price data"""
     try:
+        _rate_limit()
         resp = requests.get(
             f"{COINGECKO_URL}/coins/bitcoin/market_chart",
             params={
@@ -64,6 +84,7 @@ def fetch_price_history(hours: int = 24) -> List[Dict[str, Any]]:
 def fetch_ohlcv_data(hours: int = 24) -> List[Dict[str, Any]]:
     """Fetch OHLCV candle data"""
     try:
+        _rate_limit()
         resp = requests.get(
             f"{COINGECKO_URL}/coins/bitcoin/ohlc",
             params={
@@ -92,6 +113,7 @@ def fetch_ohlcv_data(hours: int = 24) -> List[Dict[str, Any]]:
 def fetch_market_data() -> Dict[str, Any]:
     """Fetch comprehensive market data"""
     try:
+        _rate_limit()
         resp = requests.get(
             f"{COINGECKO_URL}/coins/bitcoin",
             params={

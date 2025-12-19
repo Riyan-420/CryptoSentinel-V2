@@ -3,6 +3,7 @@ import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
 from datetime import datetime
+import time
 
 try:
     from zoneinfo import ZoneInfo
@@ -19,6 +20,15 @@ def render():
     """Render predictions page"""
     st.markdown('<h1 class="main-header">Predictions</h1>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Historical predictions and performance tracking</p>', unsafe_allow_html=True)
+    
+    # Auto-refresh every 60 seconds
+    if 'last_refresh' not in st.session_state:
+        st.session_state.last_refresh = time.time()
+    
+    time_since_refresh = time.time() - st.session_state.last_refresh
+    if time_since_refresh > 60:
+        st.session_state.last_refresh = time.time()
+        st.rerun()
     
     # Explanation dropdown
     with st.expander("How Predictions Work", expanded=False):
