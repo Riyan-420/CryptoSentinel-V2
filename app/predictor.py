@@ -16,13 +16,13 @@ logger = logging.getLogger(__name__)
 
 try:
     from zoneinfo import ZoneInfo
-    PST = ZoneInfo("America/Los_Angeles")
+    GMT_PLUS_5 = ZoneInfo("Asia/Karachi")
 except ImportError:
     try:
         import pytz
-        PST = pytz.timezone("America/Los_Angeles")
+        GMT_PLUS_5 = pytz.timezone("Asia/Karachi")
     except ImportError:
-        PST = None
+        GMT_PLUS_5 = None
         logger.warning("No timezone library available, using system timezone")
 
 # Prediction history buffer (in-memory, max 50 entries)
@@ -174,8 +174,8 @@ def generate_prediction(features: pd.DataFrame, current_price: float
             regimes = ["accumulation", "uptrend", "distribution", "downtrend"]
             regime = regimes[cluster % len(regimes)]
         
-        if PST:
-            prediction_time = datetime.now(PST)
+        if GMT_PLUS_5:
+            prediction_time = datetime.now(GMT_PLUS_5)
         else:
             prediction_time = datetime.now()
         target_time = prediction_time + timedelta(minutes=settings.PREDICTION_MINUTES)
@@ -223,8 +223,8 @@ def validate_predictions(current_price: float = None):
     from app.data_fetcher import fetch_price_history
     
     tolerance_pct = settings.DIRECTION_TOLERANCE_PCT
-    if PST:
-        now = datetime.now(PST)
+    if GMT_PLUS_5:
+        now = datetime.now(GMT_PLUS_5)
     else:
         now = datetime.now()
     

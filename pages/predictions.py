@@ -6,13 +6,13 @@ from datetime import datetime
 
 try:
     from zoneinfo import ZoneInfo
-    PST = ZoneInfo("America/Los_Angeles")
+    GMT_PLUS_5 = ZoneInfo("Asia/Karachi")
 except ImportError:
     try:
         import pytz
-        PST = pytz.timezone("America/Los_Angeles")
+        GMT_PLUS_5 = pytz.timezone("Asia/Karachi")
     except ImportError:
-        PST = None
+        GMT_PLUS_5 = None
 
 
 def render():
@@ -160,7 +160,7 @@ def render():
                         ts_str = p.get('timestamp', '')
                         if ts_str:
                             ts = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
-                            if PST:
+                            if GMT_PLUS_5:
                                 if ts.tzinfo is None:
                                     try:
                                         from zoneinfo import ZoneInfo
@@ -168,8 +168,8 @@ def render():
                                     except ImportError:
                                         import pytz
                                         ts = pytz.UTC.localize(ts)
-                                ts_pst = ts.astimezone(PST)
-                                time_display = ts_pst.strftime('%Y-%m-%d %H:%M:%S')
+                                ts_gmt5 = ts.astimezone(GMT_PLUS_5)
+                                time_display = ts_gmt5.strftime('%Y-%m-%d %H:%M:%S')
                             else:
                                 time_display = ts.strftime('%Y-%m-%d %H:%M:%S')
                         else:
