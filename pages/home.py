@@ -5,6 +5,16 @@ import plotly.express as px
 from datetime import datetime
 import pandas as pd
 
+try:
+    from zoneinfo import ZoneInfo
+    GMT_PLUS_5 = ZoneInfo("Asia/Karachi")
+except ImportError:
+    try:
+        import pytz
+        GMT_PLUS_5 = pytz.timezone("Asia/Karachi")
+    except ImportError:
+        GMT_PLUS_5 = None
+
 
 def render():
     """Render dashboard page"""
@@ -92,7 +102,12 @@ def render():
     
     if history:
         df = pd.DataFrame(history)
-        df['datetime'] = pd.to_datetime(df['timestamp'], unit='ms')
+        df['datetime'] = pd.to_datetime(df['timestamp'], unit='ms', utc=True)
+        
+        if GMT_PLUS_5:
+            df['datetime'] = df['datetime'].dt.tz_convert(GMT_PLUS_5)
+        else:
+            df['datetime'] = df['datetime'].dt.tz_localize(None)
         
         # Calculate price range for better visualization
         price_min = df['price'].min()

@@ -1,5 +1,6 @@
 """Predictor - Load models and generate predictions with validation"""
 import logging
+import json
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Any, List, Optional
@@ -24,6 +25,9 @@ except ImportError:
     except ImportError:
         GMT_PLUS_5 = None
         logger.warning("No timezone library available, using system timezone")
+
+PREDICTIONS_FILE = Path(settings.BASE_DIR) / "data" / "predictions_history.json"
+PREDICTIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
 
 # Prediction history buffer (in-memory, max 50 entries)
 prediction_history: deque = deque(maxlen=50)
@@ -216,6 +220,49 @@ def _store_prediction(prediction: Dict[str, Any]):
         "validated_at": None
     }
     prediction_history.append(entry)
+    _save_predictions_to_file()
+
+
+def _save_predictions_to_file():
+    """Save predictions to JSON file and sync to Hopsworks"""
+    try:
+        data = list(prediction_history)
+        with open(PREDICTIONS_FILE, 'w') as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        logger.error(f"Failed to save predictions to file: {e}")
+    
+    try:
+        from storage.prediction_store import sync_predictions_to_hopsworks
+        sync_predictions_to_hopsworks(list(prediction_history))
+    except Exception as e:
+        logger.warning(f"Failed to sync predictions to Hopsworks: {e}")
+
+
+def _load_predictions_from_file():
+    """Load predictions from JSON file and Hopsworks on startup"""
+    global prediction_history
+    
+    loaded_from_hopsworks = False
+    try:
+        from storage.prediction_store import fetch_predictions_from_hopsworks
+        hopsworks_predictions = fetch_predictions_from_hopsworks(limit=50)
+        if hopsworks_predictions:
+            prediction_history.extend(hopsworks_predictions)
+            logger.info(f"Loaded {len(hopsworks_predictions)} predictions from Hopsworks")
+            loaded_from_hopsworks = True
+    except Exception as e:
+        logger.warning(f"Could not load predictions from Hopsworks: {e}")
+    
+    if not loaded_from_hopsworks:
+        try:
+            if PREDICTIONS_FILE.exists():
+                with open(PREDICTIONS_FILE, 'r') as f:
+                    data = json.load(f)
+                    prediction_history.extend(data[-50:])
+                logger.info(f"Loaded {len(data)} predictions from local file")
+        except Exception as e:
+            logger.error(f"Failed to load predictions from file: {e}")
 
 
 def validate_predictions(current_price: float = None):
@@ -298,6 +345,8 @@ def validate_predictions(current_price: float = None):
             f"actual at target time=${actual_price:,.2f}, "
             f"change={actual_change_pct:.2f}%, correct={entry['was_correct']}"
         )
+    
+    _save_predictions_to_file()
 
 
 def get_prediction_history() -> List[Dict[str, Any]]:
@@ -324,3 +373,13 @@ def get_prediction_accuracy() -> Dict[str, Any]:
         )
     }
 
+
+# Load predictions from file on module initialization
+try:
+    if PREDICTIONS_FILE.exists():
+        with open(PREDICTIONS_FILE, 'r') as f:
+            data = json.load(f)
+            prediction_history.extend(data[-50:])
+        logger.info(f"Loaded {len(data)} predictions from file on startup")
+except Exception as e:
+    logger.error(f"Failed to load predictions on startup: {e}")
