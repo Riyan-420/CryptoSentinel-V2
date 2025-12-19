@@ -18,14 +18,15 @@ logger = logging.getLogger(__name__)
 
 @task(name="load_features")
 def load_features():
-    """Load features from Feature Store"""
+    """Load features from Feature Store (limited to last 3 days for efficiency)"""
     logger.info("Loading features from Feature Store")
-    df = fetch_features()
+    # Limit to 4320 rows = 3 days of minute-level data (plenty for training)
+    df = fetch_features(limit=4320)
     
     if df is None or len(df) < 50:
         raise ValueError("Insufficient feature data for training")
     
-    logger.info(f"Loaded {len(df)} feature rows")
+    logger.info(f"Loaded {len(df)} feature rows for training")
     return df
 
 

@@ -39,16 +39,42 @@ def store_features_task(features_df):
 
 
 @flow(name="feature_pipeline")
-def feature_pipeline(hours: int = 24):
+def feature_pipeline(hours: int = None):
     """
     Main feature pipeline flow.
     
     1. Fetch price data from CoinGecko
     2. Engineer technical indicators and features
     3. Store in Hopsworks Feature Store
+    
+    Smart default behavior:
+    - If Feature Store is empty: Fetch 72 hours (3 days) for initial training data
+    - If Feature Store has data: Fetch 2 hours (recent data only)
+    
+    This ensures:
+    - Initial setup has enough historical data for model training
+    - Regular runs only fetch fresh data (efficient)
+    - No manual intervention needed
     """
     logger.info("=== Starting Feature Pipeline ===")
     start_time = datetime.now()
+    
+    # Smart hour selection if not specified
+    if hours is None:
+        from storage.feature_store import get_or_create_feature_group
+        fg = get_or_create_feature_group()
+        
+        try:
+            existing_data = fg.read(limit=1) if fg else None
+            if existing_data is None or len(existing_data) == 0:
+                hours = 72  # Initial run: 3 days (enough for training, not too much)
+                logger.info("Feature Store empty - fetching 72 hours (3 days) for initial setup")
+            else:
+                hours = 2  # Regular run: 2 hours for fresh data only
+                logger.info("Feature Store has data - fetching 2 hours for updates")
+        except:
+            hours = 2  # Default to 2 hours if check fails
+            logger.info("Using default 2 hours")
     
     # Fetch data
     price_data = fetch_price_data(hours)
