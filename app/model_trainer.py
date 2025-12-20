@@ -25,35 +25,25 @@ logger = logging.getLogger(__name__)
 
 REGRESSION_MODELS = {
     "xgboost": XGBRegressor(
-        n_estimators=200,
-        max_depth=5,
-        learning_rate=0.05,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        gamma=0.1,
-        min_child_weight=3,
+        n_estimators=100,
+        max_depth=6,
+        learning_rate=0.1,
         n_jobs=-1,
         random_state=42
     ),
     "random_forest": RandomForestRegressor(
-        n_estimators=200,
-        max_depth=8,
-        min_samples_split=5,
-        min_samples_leaf=2,
-        max_features='sqrt',
+        n_estimators=100,
+        max_depth=10,
         n_jobs=-1,
         random_state=42
     ),
     "gradient_boosting": GradientBoostingRegressor(
-        n_estimators=200,
-        max_depth=4,
-        learning_rate=0.05,
-        subsample=0.8,
-        min_samples_split=5,
-        min_samples_leaf=2,
+        n_estimators=100,
+        max_depth=5,
+        learning_rate=0.1,
         random_state=42
     ),
-    "ridge": Ridge(alpha=10.0)
+    "ridge": Ridge(alpha=1.0)
 }
 
 
@@ -97,21 +87,14 @@ def train_classifier(X: pd.DataFrame, y: pd.Series
         X, y, test_size=0.2, shuffle=False
     )
     
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
-    
     model = GradientBoostingClassifier(
-        n_estimators=150,
-        max_depth=4,
-        learning_rate=0.08,
-        subsample=0.8,
-        min_samples_split=5,
-        min_samples_leaf=2,
+        n_estimators=100,
+        max_depth=5,
+        learning_rate=0.1,
         random_state=42
     )
-    model.fit(X_train_scaled, y_train)
-    preds = model.predict(X_test_scaled)
+    model.fit(X_train, y_train)
+    preds = model.predict(X_test)
     
     metrics = {
         "accuracy": float(accuracy_score(y_test, preds)),
@@ -126,11 +109,9 @@ def train_classifier(X: pd.DataFrame, y: pd.Series
 
 def train_kmeans(X: pd.DataFrame, n_clusters: int = 4) -> Tuple[KMeans, PCA]:
     """Train K-Means for market regime detection"""
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-    pca = PCA(n_components=min(8, X.shape[1]))
-    X_pca = pca.fit_transform(X_scaled)
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=20, max_iter=500)
+    pca = PCA(n_components=min(5, X.shape[1]))
+    X_pca = pca.fit_transform(X)
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
     kmeans.fit(X_pca)
     logger.info(f"K-Means trained with {n_clusters} clusters")
     return kmeans, pca
