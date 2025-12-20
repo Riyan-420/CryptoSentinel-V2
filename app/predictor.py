@@ -178,10 +178,7 @@ def generate_prediction(features: pd.DataFrame, current_price: float
             regimes = ["accumulation", "uptrend", "distribution", "downtrend"]
             regime = regimes[cluster % len(regimes)]
         
-        if GMT_PLUS_5:
-            prediction_time = datetime.now(GMT_PLUS_5)
-        else:
-            prediction_time = datetime.now()
+        prediction_time = datetime.now()
         target_time = prediction_time + timedelta(minutes=settings.PREDICTION_MINUTES)
         
         result = {
@@ -270,10 +267,7 @@ def validate_predictions(current_price: float = None):
     from app.data_fetcher import fetch_price_history
     
     tolerance_pct = settings.DIRECTION_TOLERANCE_PCT
-    if GMT_PLUS_5:
-        now = datetime.now(GMT_PLUS_5)
-    else:
-        now = datetime.now()
+    now = datetime.now()
     
     # Fetch recent price history to check target times
     try:
@@ -306,7 +300,7 @@ def validate_predictions(current_price: float = None):
         actual_price = None
         for hist_ts, hist_price in price_dict.items():
             time_diff_ms = abs(hist_ts - target_timestamp_ms)
-            if time_diff_ms <= 5 * 60 * 1000:  # 5 minute window
+            if time_diff_ms <= 5 * 60 * 1000:
                 actual_price = hist_price
                 break
         
