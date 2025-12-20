@@ -237,68 +237,56 @@ def render():
         
         with col2:
             if st.button("Check Drift Only", type="secondary"):
-                with st.spinner("Checking for drift..."):
-                    try:
+                try:
+                    with st.spinner("Checking for drift..."):
                         from app.data_fetcher import fetch_price_history
                         from app.feature_engineering import engineer_features, get_feature_names
                         from app.drift_detection import detect_drift
                         
-                        # Fetch recent data
-                        st.info("Fetching recent market data...")
                         history = fetch_price_history(hours=24)
-                        
-                        # Engineer features
-                        st.info("Engineering features...")
                         features_df = engineer_features(history)
-                        
-                        # Get feature columns
                         feature_cols = get_feature_names()
                         available_cols = [c for c in feature_cols if c in features_df.columns]
-                        
-                        # Check drift
-                        st.info("Comparing against baseline...")
                         drift_result = detect_drift(features_df, available_cols)
-                        
-                        # Display results
-                        st.markdown("---")
-                        if drift_result.get('drift_detected'):
-                            st.error(f"""
-                                **DRIFT DETECTED!**
-                                
-                                **Score:** {drift_result.get('drift_score', 0):.4f} (threshold: {drift_result.get('threshold', 0.3)})
-                                
-                                **Method:** {drift_result.get('method', 'N/A').upper()}
-                                
-                                **Recommendation:** Consider running the training pipeline to retrain with fresh data.
-                            """)
-                        else:
-                            st.success(f"""
-                                **NO DRIFT DETECTED**
-                                
-                                **Score:** {drift_result.get('drift_score', 0):.4f} (threshold: {drift_result.get('threshold', 0.3)})
-                                
-                                **Status:** Model is operating within expected parameters. No retraining needed.
-                            """)
-                        
-                        # Show feature-level details if available
-                        feature_drifts = drift_result.get('feature_drifts', {})
-                        if feature_drifts:
-                            with st.expander("Feature-Level Details"):
-                                drift_items = []
-                                for feature, data in feature_drifts.items():
-                                    if isinstance(data, dict):
-                                        drift_items.append({
-                                            "Feature": feature,
-                                            "Drifted": "✓" if data.get('drifted', False) else "✗"
-                                        })
-                                if drift_items:
-                                    drifted_count = sum(1 for item in drift_items if item["Drifted"] == "✓")
-                                    st.markdown(f"**{drifted_count} of {len(drift_items)} features showing drift**")
-                        
-                        st.rerun()
-                        
-                    except Exception as e:
-                        st.error(f"Drift check failed: {e}")
+                    
+                    st.markdown("---")
+                    st.markdown("### Drift Check Results")
+                    
+                    if drift_result.get('drift_detected'):
+                        st.error(f"""
+                            **DRIFT DETECTED!**
+                            
+                            **Score:** {drift_result.get('drift_score', 0):.4f} (threshold: {drift_result.get('threshold', 0.3)})
+                            
+                            **Method:** {drift_result.get('method', 'N/A').upper()}
+                            
+                            **Recommendation:** Consider running the training pipeline to retrain with fresh data.
+                        """)
+                    else:
+                        st.success(f"""
+                            **NO DRIFT DETECTED**
+                            
+                            **Score:** {drift_result.get('drift_score', 0):.4f} (threshold: {drift_result.get('threshold', 0.3)})
+                            
+                            **Status:** Model is operating within expected parameters. No retraining needed.
+                        """)
+                    
+                    feature_drifts = drift_result.get('feature_drifts', {})
+                    if feature_drifts:
+                        with st.expander("Feature-Level Details"):
+                            drift_items = []
+                            for feature, data in feature_drifts.items():
+                                if isinstance(data, dict):
+                                    drift_items.append({
+                                        "Feature": feature,
+                                        "Drifted": "✓" if data.get('drifted', False) else "✗"
+                                    })
+                            if drift_items:
+                                drifted_count = sum(1 for item in drift_items if item["Drifted"] == "✓")
+                                st.markdown(f"**{drifted_count} of {len(drift_items)} features showing drift**")
+                    
+                except Exception as e:
+                    st.error(f"Drift check failed: {e}")
         
         # Full training pipeline (with retraining)
         st.markdown("---")
@@ -312,15 +300,14 @@ def render():
             """)
         
         with col2:
-            if st.button("🔄 Train & Update Baseline", type="primary"):
-                with st.spinner("Running training pipeline..."):
-                    try:
+            if st.button("Train & Update Baseline", type="primary"):
+                try:
+                    with st.spinner("Running training pipeline..."):
                         from pipelines.training_pipeline import training_pipeline
                         result = training_pipeline()
-                        st.success(f"Pipeline complete! Best model: {result.get('best_model', 'N/A')}")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Pipeline failed: {e}")
+                    st.success(f"Pipeline complete! Best model: {result.get('best_model', 'N/A')}")
+                except Exception as e:
+                    st.error(f"Pipeline failed: {e}")
         
     except Exception as e:
         st.error(f"Error loading drift data: {e}")
