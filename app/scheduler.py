@@ -57,8 +57,8 @@ def _run_inference_pipeline():
 def _reload_models():
     """Force reload models from Hopsworks after training"""
     try:
-        logger.info("Reloading models after training")
-        from app.predictor import model_loader
+        logger.info("Reloading models and predictions after training")
+        from app.predictor import model_loader, _load_predictions_from_file
         model_loader._loaded = False
         from storage.model_registry import get_latest_model
         hw_model_data = get_latest_model()
@@ -68,6 +68,8 @@ def _reload_models():
             model_loader.metadata = hw_model_data.get("metadata", {})
             model_loader._loaded = True
             logger.info(f"Reloaded {len(model_loader.models)} models from Hopsworks")
+            _load_predictions_from_file()
+            logger.info("Reloaded prediction history (cleared old predictions)")
     except Exception as e:
         logger.error(f"Model reload error: {e}")
 

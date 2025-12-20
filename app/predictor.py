@@ -240,6 +240,8 @@ def _load_predictions_from_file():
     """Load predictions from JSON file and Hopsworks on startup"""
     global prediction_history
     
+    prediction_history.clear()
+    
     loaded_from_hopsworks = False
     try:
         from storage.prediction_store import fetch_predictions_from_hopsworks

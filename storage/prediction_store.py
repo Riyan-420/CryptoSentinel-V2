@@ -114,6 +114,37 @@ def fetch_predictions_from_hopsworks(limit: int = 50, hours: int = 2) -> List[Di
         return []
 
 
+def clear_prediction_history():
+    """Clear all predictions from Hopsworks and local storage"""
+    try:
+        # Clear Hopsworks feature group by deleting and recreating
+        from storage.feature_store import _connect
+        
+        project = _connect()
+        if project:
+            fs = project.get_feature_store()
+            try:
+                fg = fs.get_feature_group("prediction_history", version=1)
+                fg.delete()
+                logger.info("Deleted prediction_history feature group from Hopsworks")
+            except Exception as e:
+                logger.info(f"No existing prediction_history to delete: {e}")
+        
+        # Clear local file
+        from app.config import settings
+        predictions_file = Path(settings.BASE_DIR) / "data" / "predictions_history.json"
+        if predictions_file.exists():
+            predictions_file.unlink()
+            logger.info("Deleted local predictions file")
+        
+        logger.info("Prediction history cleared successfully")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to clear prediction history: {e}")
+        return False
+
+
 def sync_predictions_to_hopsworks(predictions: List[Dict[str, Any]]):
     """Sync current predictions to Hopsworks (called periodically)"""
     if not predictions:

@@ -73,6 +73,16 @@ def set_drift_baseline_task(features_df, feature_cols):
     logger.info("Setting drift baseline")
     set_reference_data(features_df[feature_cols])
 
+@task(name="clear_old_predictions")
+def clear_old_predictions_task():
+    from storage.prediction_store import clear_prediction_history
+    logger.info("Clearing old prediction history")
+    success = clear_prediction_history()
+    if success:
+        logger.info("Prediction history cleared successfully")
+    else:
+        logger.warning("Failed to clear prediction history")
+
 @task(name="save_and_register_models")
 def save_and_register_models(models, scaler, metrics, best_name):
     version = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -104,6 +114,7 @@ def training_pipeline():
     X, y_price, y_direction, feature_cols = prepare_training_data(features_df)
     models, scaler, metrics, best_name = train_all_models(X, y_price, y_direction)
     result = save_and_register_models(models, scaler, metrics, best_name)
+    clear_old_predictions_task()
     set_drift_baseline_task(features_df, feature_cols)
     duration = (datetime.now() - start_time).total_seconds()
     logger.info(f"Training complete ({duration:.2f}s)")
