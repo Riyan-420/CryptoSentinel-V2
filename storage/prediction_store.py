@@ -86,7 +86,7 @@ def store_predictions_to_hopsworks(predictions: List[Dict[str, Any]]):
         return False
 
 
-def fetch_predictions_from_hopsworks(limit: int = 50) -> List[Dict[str, Any]]:
+def fetch_predictions_from_hopsworks(limit: int = 50, hours: int = 2) -> List[Dict[str, Any]]:
     """Fetch predictions from Hopsworks Feature Store"""
     try:
         fg = get_prediction_feature_group()
@@ -98,10 +98,15 @@ def fetch_predictions_from_hopsworks(limit: int = 50) -> List[Dict[str, Any]]:
         if df.empty:
             return []
         
+        # Only fetch predictions from the last X hours
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        cutoff_time = pd.Timestamp.now() - pd.Timedelta(hours=hours)
+        df = df[df['timestamp'] >= cutoff_time]
+        
         df = df.sort_values('timestamp', ascending=False).head(limit)
         
         predictions = df.to_dict('records')
-        logger.info(f"Fetched {len(predictions)} predictions from Hopsworks")
+        logger.info(f"Fetched {len(predictions)} predictions from Hopsworks (last {hours}h)")
         return predictions
         
     except Exception as e:
