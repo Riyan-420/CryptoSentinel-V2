@@ -44,7 +44,14 @@ def prepare_training_data(features_df):
     y_direction = features_df.get('target_direction', (y_price > features_df['price']).astype(int))
     valid_idx = ~(X.isnull().any(axis=1) | y_price.isnull())
     X, y_price, y_direction = X[valid_idx], y_price[valid_idx], y_direction[valid_idx]
+    
+    # Log training data distribution
+    up_count = (y_direction == 1).sum()
+    down_count = (y_direction == 0).sum()
+    up_pct = (up_count / len(y_direction)) * 100 if len(y_direction) > 0 else 0
     logger.info(f"Prepared {len(X)} samples, {len(available_cols)} features")
+    logger.info(f"Direction distribution: UP={up_count} ({up_pct:.1f}%), DOWN={down_count} ({100-up_pct:.1f}%)")
+    
     return X, y_price, y_direction, available_cols
 
 @task(name="train_all_models")

@@ -134,7 +134,7 @@ def store_features(df: pd.DataFrame,
 
 
 def fetch_features(feature_group_name: str = "crypto_features",
-                   limit: int = 1000) -> Optional[pd.DataFrame]:
+                   limit: int = 8640) -> Optional[pd.DataFrame]:
     """Fetch features from Hopsworks"""
     fg = get_or_create_feature_group(feature_group_name)
     
