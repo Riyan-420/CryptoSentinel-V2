@@ -1,5 +1,5 @@
 ---
-title: CryptoSentinel V2
+title: CryptoSentinel
 emoji: 💰
 colorFrom: purple
 colorTo: blue
